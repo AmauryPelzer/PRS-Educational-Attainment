@@ -2,3 +2,7 @@
 .Rproj.user
 .RData
 *.Rproj
+.Rhistory
+
+# Ignore Mac OS files
+.DS_Store

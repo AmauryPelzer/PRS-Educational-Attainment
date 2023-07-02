@@ -1,0 +1,65 @@
+---
+title: "PRS_EA"
+output: html_document
+---
+
+# Libraries
+
+```{r}
+library(tidyverse)
+```
+
+# Changing data from long to wide
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+dat <- read.csv("data/ADNIMERGE.csv")
+
+col <- c( "RID","PTID","VISCODE", "PTETHCAT","PTRACCAT","DX_bl","AGE",
+          "PTGENDER","EXAMDATE", "PTEDUCAT","AV45","ABETA","TAU", "PTAU",
+          "CDRSB","ADAS11", "ADAS13", "ADASQ4","MMSE","RAVLT_immediate",
+          "RAVLT_learning","RAVLT_forgetting","RAVLT_perc_forgetting",
+          "LDELTOTAL","DIGITSCOR","TRABSCOR","FAQ","MOCA", "PTMARRY", "APOE4", 
+          "FDG", "DX", "mPACCdigit", "mPACCtrailsB","CDRSB_bl","ADAS11_bl",
+          "ADAS13_bl","ADASQ4_bl","MMSE_bl","RAVLT_immediate_bl",
+          "RAVLT_learning_bl","RAVLT_forgetting_bl","RAVLT_perc_forgetting_bl",
+          "LDELTOTAL_BL","DIGITSCOR_bl","TRABSCOR_bl","FAQ_bl","mPACCdigit_bl",
+          "mPACCtrailsB_bl", "ABETA_bl", "TAU_bl", "PTAU_bl") 
+
+# Define Variables of Interest & Order
+long_dat <- dat[,col] %>% arrange(RID, EXAMDATE) %>% rename(DX_bas = DX_bl)
+
+# From Long to Wide data format
+wide_dat <- long_dat %>% pivot_wider(
+  
+  names_from = VISCODE,
+  
+  id_cols = c("RID","EXAMDATE","PTID","PTETHCAT","PTRACCAT","AGE", "PTGENDER", "DX_bas", 
+              "PTEDUCAT", "CDRSB_bl", "ADAS11_bl","ADAS13_bl","ADASQ4_bl",
+              "MMSE_bl","RAVLT_immediate_bl","RAVLT_learning_bl","RAVLT_forgetting_bl",
+              "RAVLT_perc_forgetting_bl", "LDELTOTAL_BL","DIGITSCOR_bl","TRABSCOR_bl",
+              "FAQ_bl","mPACCdigit_bl","mPACCtrailsB_bl", "ABETA_bl", "TAU_bl", "PTAU_bl"),
+  
+  values_from = c("AV45","ABETA","TAU", "PTAU","CDRSB","ADAS11",
+                  "ADAS13", "ADASQ4","MMSE","RAVLT_immediate","RAVLT_learning",
+                  "RAVLT_forgetting","RAVLT_perc_forgetting","LDELTOTAL","DIGITSCOR",
+                  "TRABSCOR","FAQ","MOCA", "PTMARRY", "APOE4", "FDG", "DX", "mPACCdigit","mPACCtrailsB"),
+  
+  names_repair = unique
+  )
+```
+
+
+
+```{r}
+#Code Island
+
+#Index Column based on label
+#grep("RID", colnames(dat))
+
+# How many participants do we have?
+#length(unique(dat$RID))
+
+```
+
