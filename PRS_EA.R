@@ -1,16 +1,16 @@
 library(tidyverse)
 dat <- read.csv("ADNIMERGE.csv")
 
-col <- c( "RID","PTID","VISCODE", "PTETHCAT","PTRACCAT","DX_bl","AGE","PTGENDER","EXAMDATE",
-          "PTEDUCAT","AV45","ABETA","TAU", "PTAU","CDRSB","ADAS11",
-          "ADAS13", "ADASQ4","MMSE","RAVLT_immediate","RAVLT_learning",
-          "RAVLT_forgetting","RAVLT_perc_forgetting","LDELTOTAL","DIGITSCOR",
-          "TRABSCOR","FAQ","MOCA", "PTMARRY", "APOE4", "FDG", "DX", 
-          
-          "mPACCdigit", "mPACCtrailsB","CDRSB_bl",
-          "ADAS11_bl","ADAS13_bl","ADASQ4_bl","MMSE_bl","RAVLT_immediate_bl","RAVLT_learning_bl","RAVLT_forgetting_bl","RAVLT_perc_forgetting_bl",
-          "LDELTOTAL_BL","DIGITSCOR_bl","TRABSCOR_bl","FAQ_bl","mPACCdigit_bl","mPACCtrailsB_bl",
-          "ABETA_bl", "TAU_bl", "PTAU_bl") 
+col <- c( "RID","PTID","VISCODE", "PTETHCAT","PTRACCAT","DX_bl","AGE",
+          "PTGENDER","EXAMDATE", "PTEDUCAT","AV45","ABETA","TAU", "PTAU",
+          "CDRSB","ADAS11", "ADAS13", "ADASQ4","MMSE","RAVLT_immediate",
+          "RAVLT_learning","RAVLT_forgetting","RAVLT_perc_forgetting",
+          "LDELTOTAL","DIGITSCOR","TRABSCOR","FAQ","MOCA", "PTMARRY", "APOE4", 
+          "FDG", "DX", "mPACCdigit", "mPACCtrailsB","CDRSB_bl","ADAS11_bl",
+          "ADAS13_bl","ADASQ4_bl","MMSE_bl","RAVLT_immediate_bl",
+          "RAVLT_learning_bl","RAVLT_forgetting_bl","RAVLT_perc_forgetting_bl",
+          "LDELTOTAL_BL","DIGITSCOR_bl","TRABSCOR_bl","FAQ_bl","mPACCdigit_bl",
+          "mPACCtrailsB_bl", "ABETA_bl", "TAU_bl", "PTAU_bl") 
 
 # Define Variables of Interest & Order
 long_dat <- dat[,col] %>% arrange(RID, EXAMDATE) %>% rename(DX_bas = DX_bl)
