@@ -9,48 +9,79 @@ output: html_document
 library(tidyverse)
 ```
 
-# Changing data from long to wide
-
+#Test of Time dependency
+Variables that are not required for the analysis: "SITE","COLPROT","ORIGPROT","FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp".
 ```{r}
 knitr::opts_chunk$set(echo = TRUE)
 
 dat <- read.csv("data/ADNIMERGE.csv")
 
-col <- c( "RID","PTID","VISCODE", "PTETHCAT","PTRACCAT","DX_bl","AGE",
-          "PTGENDER","EXAMDATE", "PTEDUCAT","AV45","ABETA","TAU", "PTAU",
-          "CDRSB","ADAS11", "ADAS13", "ADASQ4","MMSE","RAVLT_immediate",
-          "RAVLT_learning","RAVLT_forgetting","RAVLT_perc_forgetting",
-          "LDELTOTAL","DIGITSCOR","TRABSCOR","FAQ","MOCA", "PTMARRY", "APOE4", 
-          "FDG", "DX", "mPACCdigit", "mPACCtrailsB","CDRSB_bl","ADAS11_bl",
-          "ADAS13_bl","ADASQ4_bl","MMSE_bl","RAVLT_immediate_bl",
-          "RAVLT_learning_bl","RAVLT_forgetting_bl","RAVLT_perc_forgetting_bl",
-          "LDELTOTAL_BL","DIGITSCOR_bl","TRABSCOR_bl","FAQ_bl","mPACCdigit_bl",
-          "mPACCtrailsB_bl", "ABETA_bl", "TAU_bl", "PTAU_bl") 
+time_test <- function(data, idvar, tvar) {
+  x <- data[, c(idvar, tvar)] %>% arrange(tvar)
+  time_dependent <- FALSE
+  unique_participants <- unique(x[, 1])
+  for (participant in unique_participants) {
+    participant_data <- x[x[, 1] == participant, 2]
+    if (length(unique(participant_data)) > 1) {
+      time_dependent <- TRUE
+      break
+    }
+  }
+  if (time_dependent) {
+    return(data.frame(variable = tvar, status = "Time Dependent"))
+  } else {
+    return(data.frame(variable = tvar, status = "Time Independent"))
+  }
+}
 
+results <- data.frame(variable = character(), status = character(), stringsAsFactors = FALSE)
+
+for (col in 1:length(colnames(dat))) {
+  result <- time_test(dat, "RID", colnames(dat)[col])
+  results <- rbind(results, result)
+}
+rm(result)
+
+exclude <- c("SITE","COLPROT","ORIGPROT","FLDSTRENG",
+                   "FSVERSION","IMAGEUID", "Month_bl","Month","M",
+                   "update_stamp")
+
+ivars <- subset(results, status=="Time Independent") %>% 
+  subset(!(variable %in% exclude))
+
+nivars <- subset(results, status=="Time Dependent") %>% 
+  subset(!(variable %in% exclude))
+```
+
+# Data Format: Long to Wide
+
+```{r}
 # Define Variables of Interest & Order
-long_dat <- dat[,col] %>% arrange(RID, EXAMDATE) %>% rename(DX_bas = DX_bl)
+long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
+  relocate(RID, PTID, EXAMDATE,VISCODE) %>%
+  arrange(RID, VISCODE) %>%
+  rename(DX_bas = DX_bl)
 
+```
+
+#Transform Long to Wide Data Format
+Next we transform the data using the pivot_wider function, which requires three 
+inputs. First, a variable to create new names from, which is in our case the 
+VISCODE variable of length 26. 
+
+```{r}
 # From Long to Wide data format
 wide_dat <- long_dat %>% pivot_wider(
   
   names_from = VISCODE,
   
-  id_cols = c("RID","EXAMDATE","PTID","PTETHCAT","PTRACCAT","AGE", "PTGENDER", "DX_bas", 
-              "PTEDUCAT", "CDRSB_bl", "ADAS11_bl","ADAS13_bl","ADASQ4_bl",
-              "MMSE_bl","RAVLT_immediate_bl","RAVLT_learning_bl","RAVLT_forgetting_bl",
-              "RAVLT_perc_forgetting_bl", "LDELTOTAL_BL","DIGITSCOR_bl","TRABSCOR_bl",
-              "FAQ_bl","mPACCdigit_bl","mPACCtrailsB_bl", "ABETA_bl", "TAU_bl", "PTAU_bl"),
+  id_cols = ivars[,1],
   
-  values_from = c("AV45","ABETA","TAU", "PTAU","CDRSB","ADAS11",
-                  "ADAS13", "ADASQ4","MMSE","RAVLT_immediate","RAVLT_learning",
-                  "RAVLT_forgetting","RAVLT_perc_forgetting","LDELTOTAL","DIGITSCOR",
-                  "TRABSCOR","FAQ","MOCA", "PTMARRY", "APOE4", "FDG", "DX", "mPACCdigit","mPACCtrailsB"),
+  values_from = nivars[,1],
   
   names_repair = unique
   )
 ```
-
-
 
 ```{r}
 #Code Island
@@ -62,4 +93,3 @@ wide_dat <- long_dat %>% pivot_wider(
 #length(unique(dat$RID))
 
 ```
-
