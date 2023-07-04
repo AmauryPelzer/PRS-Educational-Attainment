@@ -6,11 +6,15 @@ output: html_document
 # Libraries
 
 ```{r}
-library(tidyverse)
-```
+if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
+if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
+if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
+if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
 
-#Test of Time dependency
+```
+# Test of Time dependency
 Variables that are not required for the analysis: "SITE","COLPROT","ORIGPROT","FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp".
+
 ```{r}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -40,56 +44,79 @@ for (col in 1:length(colnames(dat))) {
   result <- time_test(dat, "RID", colnames(dat)[col])
   results <- rbind(results, result)
 }
-rm(result)
 
-exclude <- c("SITE","COLPROT","ORIGPROT","FLDSTRENG",
+
+excluded_vars <- c("SITE","COLPROT","ORIGPROT","FLDSTRENG",
                    "FSVERSION","IMAGEUID", "Month_bl","Month","M",
                    "update_stamp")
 
 ivars <- subset(results, status=="Time Independent") %>% 
-  subset(!(variable %in% exclude))
+  subset(!(variable %in% excluded_vars)) %>% subset(select=variable)
 
 nivars <- subset(results, status=="Time Dependent") %>% 
-  subset(!(variable %in% exclude))
+  subset(!(variable %in% excluded_vars)) %>% subset(select=variable)
+
+rm(result, col)
 ```
 
 # Data Format: Long to Wide
+Here are merge time dependent and independent variables into the long_dat data
+frame. Since the tidyverse package has some problems with ordering the VISCODE 
+data properly due to the occurrence of both strings and integers we rearrange 
+the variable to an only integer format. This will likely also make the 
+integration of "..._bl" variables into the multivariate data format more easy.
+Thus, we mutate the VISCODE data into integer values, where 0 equal baseline 
+measurements, 1 equals month 2 and so on.
 
 ```{r}
 # Define Variables of Interest & Order
 long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
-  relocate(RID, PTID, EXAMDATE,VISCODE) %>%
-  arrange(RID, VISCODE) %>%
-  rename(DX_bas = DX_bl)
-
+  mutate(VISCODE = match(VISCODE, c("bl", "m03", "m06", "m12", "m18", "m24", 
+                                    "m30","m36", "m42", "m48", "m54", "m60", 
+                                    "m66", "m72","m78", "m84", "m90", "m96", 
+                                    "m102", "m108","m114", "m120", "m126", 
+                                    "m132", "m144", "m156"))-1) %>%
+  relocate(RID, PTID, EXAMDATE, VISCODE) %>%
+  arrange(RID, VISCODE)
 ```
 
+# Attrition Analysis
+To see how many measurments we have at baseline
+````{r, fig.align="center"}
+frequency_table <- long_dat %>%
+  group_by(VISCODE) %>%
+  summarise(NumParticipants = n_distinct(RID))
+
+barplot(frequency_table$NumParticipants~frequency_table$VISCODE, xlab="Time", ylab="Number of Patients Measured",
+     main="Attrition Plot")
+```
 #Transform Long to Wide Data Format
 Next we transform the data using the pivot_wider function, which requires three 
 inputs. First, a variable to create new names from, which is in our case the 
 VISCODE variable of length 26. 
 
 ```{r}
-# From Long to Wide data format
-wide_dat <- long_dat %>% pivot_wider(
-  
-  names_from = VISCODE,
-  
-  id_cols = ivars[,1],
-  
-  values_from = nivars[,1],
-  
-  names_repair = unique
-  )
+df <- pivot_wider(
+  long_dat,
+  id_cols = as.character(ivars$variable),
+  names_from = "VISCODE",
+  values_from = as.character(nivars$variable),
+  values_fn = list(n = n_distinct),
+  names_sep = "_"
+)
 ```
 
+# Code Island
+
+For code that was useful on the way but not any more, though too cool to delete.
+Thus, I allowed these code snippets to enjoy retirement on Code Island.
+
+## Index Column based on label
 ```{r}
-#Code Island
+grep("RID", colnames(dat))
+```
 
-#Index Column based on label
-#grep("RID", colnames(dat))
-
-# How many participants do we have?
-#length(unique(dat$RID))
-
+## How many participants do we have?
+```{r}
+length(unique(dat$RID))
 ```
