@@ -1,16 +1,14 @@
 ---
 title: "PRS_EA"
 output: html_document
+author: Sebastian Marten & Amaury Pelzer
 ---
 
-# Libraries
-
-```{r}
+```{r, include=FALSE}
 if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
 if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
 if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
 if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
-
 ```
 # Test of Time dependency
 Variables that are not required for the analysis: "SITE","COLPROT","ORIGPROT","FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp".
@@ -48,15 +46,16 @@ for (col in 1:length(colnames(dat))) {
 
 excluded_vars <- c("SITE","COLPROT","ORIGPROT","FLDSTRENG",
                    "FSVERSION","IMAGEUID", "Month_bl","Month","M",
-                   "update_stamp")
+                   "update_stamp", "FSVERSION_bl", "FLDSTRENG_bl", 
+                   "EXAMDATE_bl", "EXAMDATE", "Years_bl")
 
-ivars <- subset(results, status=="Time Independent") %>% 
+ivars <- subset(results, status=="Time Independent") %>%
   subset(!(variable %in% excluded_vars)) %>% subset(select=variable)
 
 nivars <- subset(results, status=="Time Dependent") %>% 
   subset(!(variable %in% excluded_vars)) %>% subset(select=variable)
 
-rm(result, col)
+rm(results, result, col)
 ```
 
 # Data Format: Long to Wide
@@ -69,20 +68,116 @@ Thus, we mutate the VISCODE data into integer values, where 0 equal baseline
 measurements, 1 equals month 2 and so on.
 
 ```{r}
-# Define Variables of Interest & Order
 long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
   mutate(VISCODE = match(VISCODE, c("bl", "m03", "m06", "m12", "m18", "m24", 
                                     "m30","m36", "m42", "m48", "m54", "m60", 
                                     "m66", "m72","m78", "m84", "m90", "m96", 
                                     "m102", "m108","m114", "m120", "m126", 
                                     "m132", "m144", "m156"))-1) %>%
-  relocate(RID, PTID, EXAMDATE, VISCODE) %>%
+  relocate(RID, PTID, VISCODE) %>%
   arrange(RID, VISCODE)
 ```
 
+# _BL variables already correct?
+Here I test whether the baseline values maybe have already been integrated 
+because for the first few participants that looked correct. However, there 
+seem to be discrepancies in some of the values.
+
+```{r, echo = FALSE}
+baseline_vars <- long_dat %>%
+  select(c("VISCODE","PTID",ends_with("_bl"),ends_with("_BL"))) %>%
+  filter(VISCODE == 0) %>%
+  subset(select = -c(DX_bl, VISCODE)) %>%
+  rename(LDELTOTAL_bl = LDELTOTAL_BL)
+
+baseline_commplementary_vars <- long_dat %>% 
+  
+  subset(select = c(VISCODE, DX, CDRSB, ADAS11, ADAS13, ADASQ4,MMSE,
+  RAVLT_immediate,RAVLT_learning,RAVLT_forgetting,RAVLT_perc_forgetting,
+  LDELTOTAL,DIGITSCOR,TRABSCOR,FAQ,mPACCdigit,mPACCtrailsB,Ventricles,
+  Hippocampus,WholeBrain,Entorhinal,Fusiform,MidTemp,ICV,MOCA,EcogPtMem,
+  EcogPtLang,EcogPtVisspat,EcogPtPlan,EcogPtOrgan,EcogPtDivatt,EcogPtTotal,
+  EcogSPMem,EcogSPLang,EcogSPVisspat,EcogSPPlan,EcogSPOrgan,EcogSPDivatt,
+  EcogSPTotal,ABETA,TAU,PTAU,FDG,PIB,AV45)) %>%
+  
+  filter(VISCODE == 0) %>% 
+  subset(select = -c(DX, VISCODE))
+
+length(colnames(baseline_vars)) == length(colnames(baseline_commplementary_vars))
+all.equal(baseline_vars, baseline_commplementary_vars)
+```
+
+# Merge _bl/_BL variables with corresponding time dependent variable
+
+```{r}
+baseline_commplementary_col_names <- colnames(baseline_commplementary_vars)
+
+long_dat <- long_dat %>%
+  left_join(baseline_vars, by = "PTID", suffix = c("", "_bl")) %>%
+  mutate(across(all_of(baseline_commplementary_col_names), ~ coalesce(., get(paste0(cur_column(), "_bl"))))) %>%
+  select(-ends_with("_bl"), -ends_with("_BL")) %>%
+  mutate(
+    RID = as.factor(RID),
+    PTID = as.character(PTID),
+    VISCODE = as.factor(VISCODE),
+    AGE = as.numeric(AGE),
+    PTGENDER = as.factor(PTGENDER),
+    PTEDUCAT = as.integer(PTEDUCAT),
+    PTETHCAT = as.factor(PTETHCAT),
+    PTRACCAT = as.factor(PTRACCAT),
+    PTMARRY = as.factor(PTMARRY),
+    APOE4 = as.integer(APOE4),
+    FDG = as.numeric(FDG),
+    PIB = as.numeric(PIB),
+    AV45 = as.numeric(AV45),
+    ABETA = as.numeric(ABETA),
+    TAU = as.numeric(TAU),
+    PTAU = as.numeric(PTAU),
+    CDRSB = as.numeric(CDRSB),
+    ADAS11 = as.numeric(ADAS11),
+    ADAS13 = as.numeric(ADAS13),
+    ADASQ4 = as.integer(ADASQ4),
+    MMSE = as.integer(MMSE),
+    RAVLT_immediate = as.integer(RAVLT_immediate),
+    RAVLT_learning = as.integer(RAVLT_learning),
+    RAVLT_forgetting = as.integer(RAVLT_forgetting),
+    RAVLT_perc_forgetting = as.numeric(RAVLT_perc_forgetting),
+    LDELTOTAL = as.integer(LDELTOTAL),
+    DIGITSCOR = as.integer(DIGITSCOR),
+    TRABSCOR = as.integer(TRABSCOR),
+    FAQ = as.integer(FAQ),
+    MOCA = as.integer(MOCA),
+    EcogPtMem = as.numeric(EcogPtMem),
+    EcogPtLang = as.numeric(EcogPtLang),
+    EcogPtVisspat = as.numeric(EcogPtVisspat),
+    EcogPtPlan = as.numeric(EcogPtPlan),
+    EcogPtOrgan = as.numeric(EcogPtOrgan),
+    EcogPtDivatt = as.numeric(EcogPtDivatt),
+    EcogPtTotal = as.numeric(EcogPtTotal),
+    EcogSPMem = as.numeric(EcogSPMem),
+    EcogSPLang = as.numeric(EcogSPLang),
+    EcogSPVisspat = as.numeric(EcogSPVisspat),
+    EcogSPPlan = as.numeric(EcogSPPlan),
+    EcogSPOrgan = as.numeric(EcogSPOrgan),
+    EcogSPDivatt = as.numeric(EcogSPDivatt),
+    EcogSPTotal = as.numeric(EcogSPTotal),
+    Ventricles = as.integer(Ventricles),
+    Hippocampus = as.integer(Hippocampus),
+    WholeBrain = as.integer(WholeBrain),
+    Entorhinal = as.integer(Entorhinal),
+    Fusiform = as.integer(Fusiform),
+    MidTemp = as.integer(MidTemp),
+    ICV = as.integer(ICV),
+    DX = as.factor(DX),
+    mPACCdigit = as.numeric(mPACCdigit),
+    mPACCtrailsB = as.numeric(mPACCtrailsB)
+    )
+```
+
 # Attrition Analysis
-To see how many measurments we have at baseline
-````{r, fig.align="center"}
+To see how many measurements we have at baseline
+
+```{r, fig.align="center"}
 frequency_table <- long_dat %>%
   group_by(VISCODE) %>%
   summarise(NumParticipants = n_distinct(RID))
