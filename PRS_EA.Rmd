@@ -10,10 +10,13 @@ if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(g
 if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
 if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
 ```
-# Test of Time dependency
-Variables that are not required for the analysis: "SITE","COLPROT","ORIGPROT","FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp".
 
-```{r}
+# Data Preprocessing
+1. First, I wanted to investigate which variables are time dependent and also
+exclude some that were clearly unnecessary (i.e., "SITE","COLPROT","ORIGPROT",
+"FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp").
+
+```{r, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 dat <- read.csv("data/ADNIMERGE.csv")
@@ -58,14 +61,8 @@ nivars <- subset(results, status=="Time Dependent") %>%
 rm(results, result, col)
 ```
 
-# Data Format: Long to Wide
-Here are merge time dependent and independent variables into the long_dat data
-frame. Since the tidyverse package has some problems with ordering the VISCODE 
-data properly due to the occurrence of both strings and integers we rearrange 
-the variable to an only integer format. This will likely also make the 
-integration of "..._bl" variables into the multivariate data format more easy.
-Thus, we mutate the VISCODE data into integer values, where 0 equal baseline 
-measurements, 1 equals month 2 and so on.
+2. Merge time dependent and independent variables into the long_dat data
+frame. Also, I recoded the time points in the VISCODE variable into integers.
 
 ```{r}
 long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
@@ -78,12 +75,12 @@ long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
   arrange(RID, VISCODE)
 ```
 
-# _BL variables already correct?
-Here I test whether the baseline values maybe have already been integrated 
-because for the first few participants that looked correct. However, there 
-seem to be discrepancies in some of the values.
+3. In the original data frame there were quite some _bl or _BL variables. 
+Thus, I wanted to check whether these columns had already been integrated or not
+at each corresponding time point for each participant. Surprise, the test was 
+negative.
 
-```{r, echo = FALSE}
+```{r, include= FALSE}
 baseline_vars <- long_dat %>%
   select(c("VISCODE","PTID",ends_with("_bl"),ends_with("_BL"))) %>%
   filter(VISCODE == 0) %>%
@@ -107,9 +104,12 @@ length(colnames(baseline_vars)) == length(colnames(baseline_commplementary_vars)
 all.equal(baseline_vars, baseline_commplementary_vars)
 ```
 
-# Merge _bl/_BL variables with corresponding time dependent variable
+4. Therefore, I continued with merging the _bl/_BL variables with the 
+corresponding time dependent variable for each participant. Additionally, I 
+specified the data type of each variable individually for optimal control and 
+oversight over the data structure.
 
-```{r}
+```{r, include= FALSE}
 baseline_commplementary_col_names <- colnames(baseline_commplementary_vars)
 
 long_dat <- long_dat %>%
@@ -173,11 +173,35 @@ long_dat <- long_dat %>%
     mPACCtrailsB = as.numeric(mPACCtrailsB)
     )
 ```
+5. Transform Long to Wide Data Format
+
+```{r, echo=FALSE}
+ivars <- ivars %>% filter(!str_detect(variable, "_bl|_BL") & variable != "DX_bl") %>%
+  pull(variable) %>%
+  as.character()
+
+nivars <- nivars %>% 
+  filter(! str_detect(variable, "VISCODE")) %>%
+  pull(variable) %>%
+  as.character()
+
+wide_dat <- pivot_wider(
+  long_dat,
+  id_cols = all_of(ivars),
+  names_from = "VISCODE",
+  values_from = all_of(nivars),
+  values_fn = list(n = n_distinct),
+  names_sep = "_"
+  )
+
+head(wide_dat)
+```
 
 # Attrition Analysis
-To see how many measurements we have at baseline
+Based on the number of participants measured at any time point I made a 
+frequency plot to get a first idea of the sampling frequency.
 
-```{r, fig.align="center"}
+```{r, echo=FALSE, fig.align="center"}
 frequency_table <- long_dat %>%
   group_by(VISCODE) %>%
   summarise(NumParticipants = n_distinct(RID))
@@ -185,33 +209,89 @@ frequency_table <- long_dat %>%
 barplot(frequency_table$NumParticipants~frequency_table$VISCODE, xlab="Time", ylab="Number of Patients Measured",
      main="Attrition Plot")
 ```
-#Transform Long to Wide Data Format
-Next we transform the data using the pivot_wider function, which requires three 
-inputs. First, a variable to create new names from, which is in our case the 
-VISCODE variable of length 26. 
 
-```{r}
-df <- pivot_wider(
-  long_dat,
-  id_cols = as.character(ivars$variable),
-  names_from = "VISCODE",
-  values_from = as.character(nivars$variable),
-  values_fn = list(n = n_distinct),
-  names_sep = "_"
-)
+# Domains
+
+## Demographics
+
+```{r, echo=FALSE}
+df_demographics <- long_dat %>%
+  select(RID, PTID, VISCODE, AGE, PTGENDER, PTEDUCAT, PTETHCAT, PTRACCAT, PTMARRY)
+
+freq_dem <- df_demographics %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_dem_long <- pivot_longer(freq_dem, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_dem_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
 ```
 
-# Code Island
+## Cognitive Tests
 
-For code that was useful on the way but not any more, though too cool to delete.
-Thus, I allowed these code snippets to enjoy retirement on Code Island.
+```{r, echo=FALSE}
+df_cognitive_tests <- long_dat %>%
+  select(RID, PTID, VISCODE, CDRSB, ADAS11, ADAS13, ADASQ4, MMSE,
+         RAVLT_immediate, RAVLT_learning, RAVLT_forgetting, RAVLT_perc_forgetting,
+         LDELTOTAL, DIGITSCOR, TRABSCOR, FAQ, MOCA,
+         EcogPtMem, EcogPtLang, EcogPtVisspat, EcogPtPlan, EcogPtOrgan, EcogPtDivatt, EcogPtTotal,
+         EcogSPMem, EcogSPLang, EcogSPVisspat, EcogSPPlan, EcogSPOrgan, EcogSPDivatt, EcogSPTotal)
 
-## Index Column based on label
-```{r}
-grep("RID", colnames(dat))
+freq_cog <- df_cognitive_tests %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_cog_long <- pivot_longer(freq_cog, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_cog_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
 ```
 
-## How many participants do we have?
+## Biomedical Imaging
+
+```{r,echo=FALSE}
+df_biomedical_imaging <- long_dat %>%
+  select(RID, PTID, VISCODE, Ventricles, Hippocampus, WholeBrain, Entorhinal, Fusiform, MidTemp, ICV)
+
+freq_imag <- df_biomedical_imaging %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_imag_long <- pivot_longer(freq_imag, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_imag_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
+```
+
+## Biomarkers
+
+```{r, echo=FALSE}
+df_biomarkers <- long_dat %>%
+  select(RID, PTID, VISCODE, APOE4, ABETA, TAU, PTAU, FDG, PIB, AV45)
+
+freq_mark <- df_biomarkers %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_mark_long <- pivot_longer(freq_mark, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_mark_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
+```
+
+Based on these findings it appears that time point 9 is a cut-off where the 
+number of measurements drop quite strongly. Time point 9 corresponds to month 
+42 (i.e., 3.5 years) of the follow-up.
+
 ```{r}
-length(unique(dat$RID))
+rm(list= setdiff(ls(), c("long_dat", "wide_dat")))
 ```
