@@ -12,9 +12,8 @@ if (suppressWarnings(!require(formattable))) {install.packages("formattable"); l
 ```
 
 # Data Preprocessing
-1. First, I wanted to investigate which variables are time dependent and also
-exclude some that were clearly unnecessary (i.e., "SITE","COLPROT","ORIGPROT",
-"FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp").
+
+1.  First, I wanted to investigate which variables are time dependent and also exclude some that were clearly unnecessary (i.e., "SITE","COLPROT","ORIGPROT", "FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp").
 
 ```{r, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -61,8 +60,7 @@ nivars <- subset(results, status=="Time Dependent") %>%
 rm(results, result, col)
 ```
 
-2. Merge time dependent and independent variables into the long_dat data
-frame. Also, I recoded the time points in the VISCODE variable into integers.
+2.  Merge time dependent and independent variables into the long_dat data frame. Also, I recoded the time points in the VISCODE variable into integers.
 
 ```{r}
 long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
@@ -75,10 +73,7 @@ long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
   arrange(RID, VISCODE)
 ```
 
-3. In the original data frame there were quite some _bl or _BL variables. 
-Thus, I wanted to check whether these columns had already been integrated or not
-at each corresponding time point for each participant. Surprise, the test was 
-negative.
+3.  In the original data frame there were quite some \_bl or \_BL variables. Thus, I wanted to check whether these columns had already been integrated or not at each corresponding time point for each participant. Surprise, the test was negative.
 
 ```{r, include= FALSE}
 baseline_vars <- long_dat %>%
@@ -104,10 +99,7 @@ length(colnames(baseline_vars)) == length(colnames(baseline_commplementary_vars)
 all.equal(baseline_vars, baseline_commplementary_vars)
 ```
 
-4. Therefore, I continued with merging the _bl/_BL variables with the 
-corresponding time dependent variable for each participant. Additionally, I 
-specified the data type of each variable individually for optimal control and 
-oversight over the data structure.
+4.  Therefore, I continued with merging the \_bl/\_BL variables with the corresponding time dependent variable for each participant. Additionally, I specified the data type of each variable individually for optimal control and oversight over the data structure.
 
 ```{r, include= FALSE}
 baseline_commplementary_col_names <- colnames(baseline_commplementary_vars)
@@ -173,7 +165,8 @@ long_dat <- long_dat %>%
     mPACCtrailsB = as.numeric(mPACCtrailsB)
     )
 ```
-5. Transform Long to Wide Data Format
+
+5.  Transform Long to Wide Data Format
 
 ```{r, echo=FALSE}
 ivars <- ivars %>% filter(!str_detect(variable, "_bl|_BL") & variable != "DX_bl") %>%
@@ -198,8 +191,8 @@ head(wide_dat)
 ```
 
 # Attrition Analysis
-Based on the number of participants measured at any time point I made a 
-frequency plot to get a first idea of the sampling frequency.
+
+Based on the number of participants measured at any time point I made a frequency plot to get a first idea of the sampling frequency.
 
 ```{r, echo=FALSE, fig.align="center"}
 frequency_table <- long_dat %>%
@@ -288,10 +281,51 @@ ggplot(freq_mark_long, aes(x = VISCODE, y = Frequency, color = Variable, group =
   theme(legend.position = "top")
 ```
 
-Based on these findings it appears that time point 9 is a cut-off where the 
-number of measurements drop quite strongly. Time point 9 corresponds to month 
-42 (i.e., 3.5 years) of the follow-up.
+Based on these findings it appears that time point 9 is a cut-off where the number of measurements drop quite strongly. Time point 9 corresponds to month 42 (i.e., 3.5 years) of the follow-up.
 
-```{r}
+```{r, echo=FALSE}
 rm(list= setdiff(ls(), c("long_dat", "wide_dat")))
+```
+
+# Polygenic Risk Score for Educational attainment
+
+```{r, echo=FALSE, message=FALSE}
+# Read in the PGS send to us by Rick
+pgs <- readr::read_tsv("ADNI_PRS_results_EA_EA22.tsv")
+
+# Merge the EA data with the corresponding participant in each data frame
+long_dat <- merge(long_dat, pgs,by.x="PTID",by.y="SampleID") 
+wide_dat <- merge(wide_dat, pgs,by.x="PTID",by.y="SampleID")
+```
+
+The merge(by.x, by.y) function creates a new data frame that only keeps those rows for which there is a matching key (in our case PTID). Therefore, we do have genetic data from 2 additional individuals for which we do not have any other measurements. The final data frame for which testing data and genetic data is available is thus, 1408 (N).
+
+## Plot PGS EA vs. Actual EA
+
+```{r, echo=FALSE, message=FALSE}
+# Plot PGS EA against Actual EA
+ggplot(long_dat, aes(x = PTEDUCAT, y = EA22)) +
+  geom_point() +  # Add points
+  geom_smooth(method = "lm") +  # Add linear regression line
+  labs(x = "Years of Education", y = "EA22") +  # Set axis labels
+  ggtitle("EA22 vs Years of Education")  # Set plot title
+```
+
+## Create Residuals
+
+To get the residual we regressed the polygenic risk score for educational attainment
+against actual EA including the variables SEX & AGE as covariates. The results are depicted in the density plot.
+
+```{r, echo=FALSE}
+# Create the residuals given two covariates AGE and Sex
+results <- lm(EA22~PTEDUCAT+AGE+PTGENDER,data=long_dat)
+
+# Standardize the residuals and append to data frame
+long_dat$res <- rstandard(results)
+
+# Create density plot of the residuals
+ggplot(long_dat, aes(x = res)) +
+  geom_density(fill = "orange", alpha = 0.5) +
+  labs(x = "Residual Score", y = "Density") +
+  ggtitle("Distribution of Residuals")
 ```
