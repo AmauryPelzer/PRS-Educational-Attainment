@@ -9,6 +9,7 @@ if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); libra
 if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
 if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
 if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
+if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
 ```
 
 # Data Preprocessing
@@ -304,8 +305,6 @@ The merge(by.x, by.y) function creates a new data frame that only keeps those ro
 
 Based on this plot, we can see a positive relationship between the polygenic score for education attainment and actual years of education. This means that with a higher PGS score comes higher genetic capacity for educational attainment.
 
-From this, a person with a negative residual score (below the regression) outperformed his genetic capability for educational attainment (aka overachiever).
-
 We ran Pearson's correlation which resulted in r = 0.286 (p-value < 2.2e-16)
 
 ```{r, echo=FALSE, message=FALSE, results='hide'}
@@ -371,7 +370,7 @@ residual_plot
 
 Using the ntile function from dplyr, the lower thirtile will be assigned value 1 (~ negative residual), middle thirtile value 2 and upper thirtile value 3 (~positive residual).
 
-```{r}
+```{r, echo=FALSE}
 # Divide the standardized residuals into upper, middle and lower quartile
 long_dat$thirtile <- ntile(long_dat$res, 3)
 ```
@@ -379,14 +378,14 @@ long_dat$thirtile <- ntile(long_dat$res, 3)
 ## Mini-Mental State Examination (MMSE)
 
 ```{r, echo=FALSE, message=FALSE, results='hide'}
-library(survival)
 long_dat$MMSE_cut <- ifelse(long_dat$MMSE < 25, 1, 0)
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile, data = long_dat)
 
 # Create the Kaplan-Meier survival plot
-plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2) + legend("topright", legend = c("over-performed", "middle", "under-performed"), col = c("blue", "green", "red"), lwd = 2)
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("topright", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 ```
 
 ```{r}
@@ -400,16 +399,9 @@ head(logrank_test)
 ggplot(long_dat, aes(x = as.integer(VISCODE), fill = factor(MMSE_cut))) +
   geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
   scale_fill_manual(values = c("blue", "red"), labels = c("0", "1")) +
-  labs(title = "Overlapped Histograms of Occurrence",
-       x = "Time", y = "Frequency") +
-  theme_minimal()
-
-ggplot(long_dat, aes(x = as.integer(VISCODE), fill = factor(MMSE_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("blue", "red"), labels = c("0", "1")) +
   facet_wrap(~ thirtile, ncol = 1) +
   labs(title = "Overlapped Histograms of Occurrence by Group",
-       x = "Time", y = "Frequency") +
+       x = "Time", y = "Number of participants") +
   theme_minimal()
 ```
 
