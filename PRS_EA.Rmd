@@ -302,13 +302,18 @@ The merge(by.x, by.y) function creates a new data frame that only keeps those ro
 
 ## Plot PGS EA vs. Actual EA
 
-```{r, echo=FALSE, message=FALSE}
+We ran Pearson's correlation which resulted in r = 0.286 (p-value < 2.2e-16)
+
+```{r, echo=FALSE, message=FALSE, results='hide'}
 # Plot PGS EA against Actual EA
 ggplot(long_dat, aes(x = PTEDUCAT, y = EA22)) +
   geom_point() +  # Add points
   geom_smooth(method = "lm") +  # Add linear regression line
   labs(x = "Years of Education", y = "EA22") +  # Set axis labels
   ggtitle("EA22 vs Years of Education")  # Set plot title
+
+cor(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
+cor.test(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
 ```
 
 ## Create Residuals
