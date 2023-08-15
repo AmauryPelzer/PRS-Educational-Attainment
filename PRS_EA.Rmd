@@ -291,7 +291,7 @@ rm(list= setdiff(ls(), c("long_dat", "wide_dat")))
 
 ```{r, echo=FALSE, message=FALSE}
 # Read in the PGS send to us by Rick
-pgs <- readr::read_tsv("ADNI_PRS_results_EA_EA22.tsv")
+pgs <- readr::read_tsv("data/ADNI_PRS_results_EA_EA22.tsv")
 
 # Merge the EA data with the corresponding participant in each data frame
 long_dat <- merge(long_dat, pgs,by.x="PTID",by.y="SampleID") 
