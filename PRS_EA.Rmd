@@ -327,7 +327,7 @@ against actual EA including the variables SEX & AGE as covariates. The results a
 
 ```{r, echo=FALSE}
 # Create the residuals given two covariates AGE and Sex
-results <- lm(EA22~PTEDUCAT+AGE+PTGENDER,data=long_dat)
+results <- lm(PTEDUCAT~EA22+AGE+PTGENDER,data=long_dat)
 
 # Standardize the residuals and append to data frame
 long_dat$res <- rstandard(results)
@@ -337,6 +337,34 @@ ggplot(long_dat, aes(x = res)) +
   geom_density(fill = "orange", alpha = 0.5) +
   labs(x = "Residual Score", y = "Density") +
   ggtitle("Distribution of Residuals")
+```
+
+## How to interpret the Residuals?
+
+It is important to correctly interpret the residual scores. The correct way to interpret them is, that a high residual score means that the individual has over-performed relative to his or her genetic capacity. See for example in this table for a short proof:
+
+```{r, echo=FALSE}
+residuals <- results$residuals # get residuals
+predicted_scores <- predict(results) # get predicted scores for each individual
+
+combined_df <- data.frame(Actual = long_dat$PTEDUCAT, Predicted = as.numeric(predicted_scores), Residuals = as.numeric(residuals)) # Combine residuals, predicted scores, and actual scores into one data frame
+
+head(combined_df) # present data frame as example
+```
+
+It is interesting to see that the residual plot is not normally distributed. 
+**Does this suggest that we should continue using non-parametric analysis 
+techniques?**
+
+```{r, echo=FALSE}
+# Create a residual plot
+residual_plot <- ggplot() +
+  geom_qq(aes(sample = residuals)) +
+  geom_qq_line() +
+  labs(title = "Normal Q-Q Plot of Residuals") +
+  theme_minimal()
+
+residual_plot
 ```
 
 # Survival Analysis
