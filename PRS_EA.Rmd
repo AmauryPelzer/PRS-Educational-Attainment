@@ -901,3 +901,405 @@ ggplot(long_dat %>% filter(!is.na(TRABSCOR_cut)),
        fill = "Legend Title") +
   theme_minimal()
 ```
+
+## Patient's Everyday Cognition (EcogPtLang)
+
+```{r, echo=FALSE}
+cvalue$EcogPtLang <- mean(wide_dat$EcogPtLang_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtLang_0, na.rm = TRUE)
+
+long_dat$EcogPtLang_cut <- ifelse(long_dat$EcogPtLang > cvalue$EcogPtLang, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogPtLang <- survdiff(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogPtLang$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtLang_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtLang_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+## Patient's Everyday Cognition (EcogPtMem)
+
+```{r, echo=FALSE}
+cvalue$EcogPtMem <- mean(wide_dat$EcogPtMem_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtMem_0, na.rm = TRUE)
+
+long_dat$EcogPtMem_cut <- ifelse(long_dat$EcogPtMem > cvalue$EcogPtMem, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogPtMem <- survdiff(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogPtMem$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtMem_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtMem_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+## Patient's Everyday Cognition (EcogPtOrgan)
+
+```{r, echo=FALSE}
+cvalue$EcogPtOrgan <- mean(wide_dat$EcogPtOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtOrgan_0, na.rm = TRUE)
+
+long_dat$EcogPtOrgan_cut <- ifelse(long_dat$EcogPtOrgan > cvalue$EcogPtOrgan, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogPtOrgan <- survdiff(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogPtOrgan$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtOrgan_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtOrgan_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+## Patient's Everyday Cognition (EcogPtPlan)
+
+```{r, echo=FALSE}
+cvalue$EcogPtPlan <- mean(wide_dat$EcogPtPlan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtPlan_0, na.rm = TRUE)
+
+long_dat$EcogPtPlan_cut <- ifelse(long_dat$EcogPtPlan > cvalue$EcogPtPlan, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogPtPlan <- survdiff(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogPtPlan$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtPlan_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtPlan_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+## Patient's Everyday Cognition (EcogPtTotal)
+
+```{r, echo=FALSE}
+cvalue$EcogPtTotal <- mean(wide_dat$EcogPtTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtTotal_0, na.rm = TRUE)
+
+long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogPtTotal <- survdiff(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogPtTotal$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtTotal_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+## Patient's Everyday Cognition (EcogPtVisspat)
+
+```{r, echo=FALSE}
+cvalue$EcogPtVisspat <- mean(wide_dat$EcogPtVisspat_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtVisspat_0, na.rm = TRUE)
+
+long_dat$EcogPtVisspat_cut <- ifelse(long_dat$EcogPtVisspat > cvalue$EcogPtVisspat, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogPtVisspat <- survdiff(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogPtVisspat$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtVisspat_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPDivatt)
+
+```{r, echo=FALSE}
+cvalue$EcogSPDivatt <- mean(wide_dat$EcogSPDivatt_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPDivatt_0, na.rm = TRUE)
+
+long_dat$EcogSPDivatt_cut <- ifelse(long_dat$EcogSPDivatt > cvalue$EcogSPDivatt, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogSPDivatt <- survdiff(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogSPDivatt$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPDivatt_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPDivatt_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPLang)
+
+```{r, echo=FALSE}
+cvalue$EcogSPLang <- mean(wide_dat$EcogSPLang_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPLang_0, na.rm = TRUE)
+
+long_dat$EcogSPLang_cut <- ifelse(long_dat$EcogSPLang > cvalue$EcogSPLang, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogSPLang <- survdiff(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogSPLang$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPLang_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPLang_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPMem)
+
+```{r, echo=FALSE}
+cvalue$EcogSPMem <- mean(wide_dat$EcogSPMem_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPMem_0, na.rm = TRUE)
+
+long_dat$EcogSPMem_cut <- ifelse(long_dat$EcogSPMem > cvalue$EcogSPMem, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogSPMem <- survdiff(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogSPMem$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPMem_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPMem_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPOrgan)
+
+```{r, echo=FALSE}
+cvalue$EcogSPOrgan <- mean(wide_dat$EcogSPOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPOrgan_0, na.rm = TRUE)
+
+long_dat$EcogSPOrgan_cut <- ifelse(long_dat$EcogSPOrgan > cvalue$EcogSPOrgan, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogSPOrgan <- survdiff(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogSPOrgan$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPOrgan_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPOrgan_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPPlan)
+
+```{r, echo=FALSE}
+cvalue$EcogSPPlan <- mean(wide_dat$EcogSPPlan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPPlan_0, na.rm = TRUE)
+
+long_dat$EcogSPPlan_cut <- ifelse(long_dat$EcogSPPlan > cvalue$EcogSPPlan, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogSPPlan <- survdiff(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogSPPlan$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPPlan_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPPlan_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
+
+
+
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPTotal)
+
+```{r, echo=FALSE}
+cvalue$EcogSPTotal <- mean(wide_dat$EcogSPTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPTotal_0, na.rm = TRUE)
+
+long_dat$EcogSPTotal_cut <- ifelse(long_dat$EcogSPTotal > cvalue$EcogSPTotal, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile, data = long_dat)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+
+# Log Rank Test 
+logrank_test$EcogSPTotal <- survdiff(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile, data = long_dat)
+print(c("Log Rank Test p-value:", logrank_test$EcogSPTotal$pvalue))
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPTotal_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPTotal_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("blue", "orange"), labels = c("0", "1")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal()
+```
