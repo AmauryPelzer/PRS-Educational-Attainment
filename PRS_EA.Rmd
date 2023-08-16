@@ -10,6 +10,7 @@ if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(g
 if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
 if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
 if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
+if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
 ```
 
 # Data Preprocessing
@@ -381,16 +382,20 @@ long_dat$thirtile <- ntile(long_dat$res, 3)
 long_dat$MMSE_cut <- ifelse(long_dat$MMSE < 25, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
-legend("topright", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
+legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
 logrank_test <- list()
-logrank_test$MMSE <- survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$MMSE$pvalue))
+logrank_test$MMSE <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile, data = .)
+logrank_test$MMSE
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(MMSE_cut)), 
@@ -418,15 +423,19 @@ cvalue$ADAS11 <- mean(wide_dat$ADAS11_0, na.rm=TRUE) + 2* sd(wide_dat$ADAS11_0, 
 long_dat$ADAS11_cut <- ifelse(long_dat$ADAS11 > cvalue$ADAS11, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), ADAS11_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), ADAS11_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$ADAS11 <- survdiff(Surv(as.integer(VISCODE), ADAS11_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$ADAS11$pvalue))
+logrank_test$ADAS11 <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), ADAS11_cut) ~ thirtile, data = .)
+logrank_test$ADAS11
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(ADAS11_cut)), 
@@ -449,15 +458,19 @@ cvalue$ADAS13 <- mean(wide_dat$ADAS13_0, na.rm=TRUE) + 2* sd(wide_dat$ADAS13_0, 
 long_dat$ADAS13_cut <- ifelse(long_dat$ADAS13 > cvalue$ADAS13, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), ADAS13_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), ADAS13_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$ADAS13 <- survdiff(Surv(as.integer(VISCODE), ADAS13_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$ADAS13$pvalue))
+logrank_test$ADAS13 <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), ADAS13_cut) ~ thirtile, data = .)
+logrank_test$ADAS13
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(ADAS13_cut)), 
@@ -481,15 +494,19 @@ cvalue$ADASQ4 <- mean(wide_dat$ADASQ4_0, na.rm=TRUE) + 2* sd(wide_dat$ADASQ4_0, 
 long_dat$ADASQ4_cut <- ifelse(long_dat$ADASQ4 > cvalue$ADASQ4, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), ADASQ4_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), ADASQ4_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$ADASQ4 <- survdiff(Surv(as.integer(VISCODE), ADASQ4_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$ADASQ4$pvalue))
+logrank_test$ADASQ4 <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), ADASQ4_cut) ~ thirtile, data = .)
+logrank_test$ADASQ4
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(ADASQ4_cut)), 
@@ -514,15 +531,19 @@ cvalue$CDRSB <- mean(wide_dat$CDRSB_0, na.rm=TRUE) + 2* sd(wide_dat$CDRSB_0, na.
 long_dat$CDRSB_cut <- ifelse(long_dat$CDRSB > cvalue$CDRSB, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), CDRSB_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), CDRSB_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$CDRSB <- survdiff(Surv(as.integer(VISCODE), CDRSB_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$CDRSB$pvalue))
+logrank_test$CDRSB <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), CDRSB_cut) ~ thirtile, data = .)
+logrank_test$CDRSB
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(CDRSB_cut)), 
@@ -547,15 +568,19 @@ cvalue$DIGITSCOR <- mean(wide_dat$DIGITSCOR_0, na.rm=TRUE) + 2* sd(wide_dat$DIGI
 long_dat$DIGITSCOR_cut <- ifelse(long_dat$DIGITSCOR > cvalue$DIGITSCOR, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), DIGITSCOR_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), DIGITSCOR_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$DIGITSCOR <- survdiff(Surv(as.integer(VISCODE), DIGITSCOR_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$DIGITSCOR$pvalue))
+logrank_test$DIGITSCOR <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), DIGITSCOR_cut) ~ thirtile, data = .)
+logrank_test$DIGITSCOR
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(DIGITSCOR_cut)), 
@@ -580,15 +605,19 @@ cvalue$EcogPtDivatt <- mean(wide_dat$EcogPtDivatt_0, na.rm=TRUE) + 2* sd(wide_da
 long_dat$EcogPtDivatt_cut <- ifelse(long_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtDivatt <- survdiff(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtDivatt$pvalue))
+logrank_test$EcogPtDivatt <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = .)
+logrank_test$EcogPtDivatt
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtDivatt_cut)), 
@@ -613,15 +642,19 @@ cvalue$EcogSPVisspat <- mean(wide_dat$EcogSPVisspat_0, na.rm=TRUE) + 2* sd(wide_
 long_dat$EcogSPVisspat_cut <- ifelse(long_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPVisspat <- survdiff(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPVisspat$pvalue))
+logrank_test$EcogSPVisspat <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = .)
+logrank_test$EcogSPVisspat
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPVisspat_cut)), 
@@ -646,15 +679,19 @@ cvalue$FAQ <- mean(wide_dat$FAQ_0, na.rm=TRUE) + 2* sd(wide_dat$FAQ_0, na.rm = T
 long_dat$FAQ_cut <- ifelse(long_dat$FAQ > cvalue$FAQ, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), FAQ_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), FAQ_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$FAQ <- survdiff(Surv(as.integer(VISCODE), FAQ_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$FAQ$pvalue))
+logrank_test$FAQ <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), FAQ_cut) ~ thirtile, data = .)
+logrank_test$FAQ
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(FAQ_cut)), 
@@ -679,15 +716,19 @@ cvalue$LDELTOTAL <- mean(wide_dat$LDELTOTAL_0, na.rm=TRUE) + 2* sd(wide_dat$LDEL
 long_dat$LDELTOTAL_cut <- ifelse(long_dat$LDELTOTAL > cvalue$LDELTOTAL, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), LDELTOTAL_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), LDELTOTAL_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$LDELTOTAL <- survdiff(Surv(as.integer(VISCODE), LDELTOTAL_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$LDELTOTAL$pvalue))
+logrank_test$LDELTOTAL <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), LDELTOTAL_cut) ~ thirtile, data = .)
+logrank_test$LDELTOTAL
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(LDELTOTAL_cut)), 
@@ -712,15 +753,19 @@ cvalue$MOCA <- mean(wide_dat$MOCA_0, na.rm=TRUE) + 2* sd(wide_dat$MOCA_0, na.rm 
 long_dat$MOCA_cut <- ifelse(long_dat$MOCA > cvalue$MOCA, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), MOCA_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), MOCA_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$MOCA <- survdiff(Surv(as.integer(VISCODE), MOCA_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$MOCA$pvalue))
+logrank_test$MOCA <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), MOCA_cut) ~ thirtile, data = .)
+logrank_test$MOCA
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(MOCA_cut)), 
@@ -745,15 +790,19 @@ cvalue$RAVLT_forgetting <- mean(wide_dat$RAVLT_forgetting_0, na.rm=TRUE) + 2* sd
 long_dat$RAVLT_forgetting_cut <- ifelse(long_dat$RAVLT_forgetting > cvalue$RAVLT_forgetting, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$RAVLT_forgetting <- survdiff(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$RAVLT_forgetting$pvalue))
+logrank_test$RAVLT_forgetting <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = .)
+logrank_test$RAVLT_forgetting
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(RAVLT_forgetting_cut)), 
@@ -778,15 +827,19 @@ cvalue$RAVLT_immediate <- mean(wide_dat$RAVLT_immediate_0, na.rm=TRUE) + 2* sd(w
 long_dat$RAVLT_immediate_cut <- ifelse(long_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$RAVLT_immediate <- survdiff(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$RAVLT_immediate$pvalue))
+logrank_test$RAVLT_immediate <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = .)
+logrank_test$RAVLT_immediate
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(RAVLT_immediate_cut)), 
@@ -811,15 +864,19 @@ cvalue$RAVLT_learning <- mean(wide_dat$RAVLT_learning_0, na.rm=TRUE) + 2* sd(wid
 long_dat$RAVLT_learning_cut <- ifelse(long_dat$RAVLT_learning > cvalue$RAVLT_learning, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), RAVLT_learning_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), RAVLT_learning_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$RAVLT_learning <- survdiff(Surv(as.integer(VISCODE), RAVLT_learning_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$RAVLT_learning$pvalue))
+logrank_test$RAVLT_learning <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), RAVLT_learning_cut) ~ thirtile, data = .)
+logrank_test$RAVLT_learning
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(RAVLT_learning_cut)), 
@@ -844,15 +901,19 @@ cvalue$RAVLT_forgetting <- mean(wide_dat$RAVLT_forgetting_0, na.rm=TRUE) + 2* sd
 long_dat$RAVLT_forgetting_cut <- ifelse(long_dat$RAVLT_forgetting > cvalue$RAVLT_forgetting, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$RAVLT_forgetting <- survdiff(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$RAVLT_forgetting$pvalue))
+logrank_test$RAVLT_forgetting <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile, data = .)
+logrank_test$RAVLT_forgetting
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(RAVLT_forgetting_cut)), 
@@ -877,15 +938,19 @@ cvalue$TRABSCOR <- mean(wide_dat$TRABSCOR_0, na.rm=TRUE) + 2* sd(wide_dat$TRABSC
 long_dat$TRABSCOR_cut <- ifelse(long_dat$TRABSCOR > cvalue$TRABSCOR, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), TRABSCOR_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), TRABSCOR_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$TRABSCOR <- survdiff(Surv(as.integer(VISCODE), TRABSCOR_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$TRABSCOR$pvalue))
+logrank_test$TRABSCOR <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), TRABSCOR_cut) ~ thirtile, data = .)
+logrank_test$TRABSCOR
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(TRABSCOR_cut)), 
@@ -910,15 +975,19 @@ cvalue$EcogPtLang <- mean(wide_dat$EcogPtLang_0, na.rm=TRUE) + 2* sd(wide_dat$Ec
 long_dat$EcogPtLang_cut <- ifelse(long_dat$EcogPtLang > cvalue$EcogPtLang, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtLang <- survdiff(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtLang$pvalue))
+logrank_test$EcogPtLang <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile, data = .)
+logrank_test$EcogPtLang
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtLang_cut)), 
@@ -943,15 +1012,19 @@ cvalue$EcogPtMem <- mean(wide_dat$EcogPtMem_0, na.rm=TRUE) + 2* sd(wide_dat$Ecog
 long_dat$EcogPtMem_cut <- ifelse(long_dat$EcogPtMem > cvalue$EcogPtMem, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtMem <- survdiff(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtMem$pvalue))
+logrank_test$EcogPtMem <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile, data = .)
+logrank_test$EcogPtMem
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtMem_cut)), 
@@ -976,15 +1049,19 @@ cvalue$EcogPtOrgan <- mean(wide_dat$EcogPtOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$
 long_dat$EcogPtOrgan_cut <- ifelse(long_dat$EcogPtOrgan > cvalue$EcogPtOrgan, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtOrgan <- survdiff(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtOrgan$pvalue))
+logrank_test$EcogPtOrgan <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile, data = .)
+logrank_test$EcogPtOrgan
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtOrgan_cut)), 
@@ -1009,15 +1086,19 @@ cvalue$EcogPtPlan <- mean(wide_dat$EcogPtPlan_0, na.rm=TRUE) + 2* sd(wide_dat$Ec
 long_dat$EcogPtPlan_cut <- ifelse(long_dat$EcogPtPlan > cvalue$EcogPtPlan, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtPlan <- survdiff(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtPlan$pvalue))
+logrank_test$EcogPtPlan <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile, data = .)
+logrank_test$EcogPtPlan
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtPlan_cut)), 
@@ -1042,15 +1123,19 @@ cvalue$EcogPtTotal <- mean(wide_dat$EcogPtTotal_0, na.rm=TRUE) + 2* sd(wide_dat$
 long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtTotal <- survdiff(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtTotal$pvalue))
+logrank_test$EcogPtTotal <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = .)
+logrank_test$EcogPtTotal
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)), 
@@ -1075,15 +1160,19 @@ cvalue$EcogPtVisspat <- mean(wide_dat$EcogPtVisspat_0, na.rm=TRUE) + 2* sd(wide_
 long_dat$EcogPtVisspat_cut <- ifelse(long_dat$EcogPtVisspat > cvalue$EcogPtVisspat, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogPtVisspat <- survdiff(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogPtVisspat$pvalue))
+logrank_test$EcogPtVisspat <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile, data = .)
+logrank_test$EcogPtVisspat
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)), 
@@ -1108,15 +1197,19 @@ cvalue$EcogSPDivatt <- mean(wide_dat$EcogSPDivatt_0, na.rm=TRUE) + 2* sd(wide_da
 long_dat$EcogSPDivatt_cut <- ifelse(long_dat$EcogSPDivatt > cvalue$EcogSPDivatt, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPDivatt <- survdiff(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPDivatt$pvalue))
+logrank_test$EcogSPDivatt <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile, data = .)
+logrank_test$EcogSPDivatt
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPDivatt_cut)), 
@@ -1142,15 +1235,19 @@ cvalue$EcogSPLang <- mean(wide_dat$EcogSPLang_0, na.rm=TRUE) + 2* sd(wide_dat$Ec
 long_dat$EcogSPLang_cut <- ifelse(long_dat$EcogSPLang > cvalue$EcogSPLang, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPLang <- survdiff(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPLang$pvalue))
+logrank_test$EcogSPLang <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile, data = .)
+logrank_test$EcogSPLang
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPLang_cut)), 
@@ -1176,15 +1273,19 @@ cvalue$EcogSPMem <- mean(wide_dat$EcogSPMem_0, na.rm=TRUE) + 2* sd(wide_dat$Ecog
 long_dat$EcogSPMem_cut <- ifelse(long_dat$EcogSPMem > cvalue$EcogSPMem, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPMem <- survdiff(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPMem$pvalue))
+logrank_test$EcogSPMem <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile, data = .)
+logrank_test$EcogSPMem
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPMem_cut)), 
@@ -1210,15 +1311,19 @@ cvalue$EcogSPOrgan <- mean(wide_dat$EcogSPOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$
 long_dat$EcogSPOrgan_cut <- ifelse(long_dat$EcogSPOrgan > cvalue$EcogSPOrgan, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPOrgan <- survdiff(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPOrgan$pvalue))
+logrank_test$EcogSPOrgan <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile, data = .)
+logrank_test$EcogSPOrgan
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPOrgan_cut)), 
@@ -1244,15 +1349,19 @@ cvalue$EcogSPPlan <- mean(wide_dat$EcogSPPlan_0, na.rm=TRUE) + 2* sd(wide_dat$Ec
 long_dat$EcogSPPlan_cut <- ifelse(long_dat$EcogSPPlan > cvalue$EcogSPPlan, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPPlan <- survdiff(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPPlan$pvalue))
+logrank_test$EcogSPPlan <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile, data = .)
+logrank_test$EcogSPPlan
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPPlan_cut)), 
@@ -1279,15 +1388,19 @@ cvalue$EcogSPTotal <- mean(wide_dat$EcogSPTotal_0, na.rm=TRUE) + 2* sd(wide_dat$
 long_dat$EcogSPTotal_cut <- ifelse(long_dat$EcogSPTotal > cvalue$EcogSPTotal, 1, 0)
 
 # Fit the Kaplan-Meier estimator
-surv_fit <- survfit(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile, data = long_dat)
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
 plot(surv_fit, main = "Kaplan-Meier Survival Curve", xlab = "Time", ylab = "Survival Probability", col = c("blue", "green", "red"), lwd = 2)
 legend("bottomleft", legend = c("under-performed", "middle", "over-performed"), col = c("blue", "green", "red"), lwd = 2)
 
 # Log Rank Test 
-logrank_test$EcogSPTotal <- survdiff(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile, data = long_dat)
-print(c("Log Rank Test p-value:", logrank_test$EcogSPTotal$pvalue))
+logrank_test$EcogSPTotal <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile, data = .)
+logrank_test$EcogSPTotal
 
 # Histogram depicting the number of people measured at each time point by group by outcome
 ggplot(long_dat %>% filter(!is.na(EcogSPTotal_cut)), 
@@ -1303,3 +1416,4 @@ ggplot(long_dat %>% filter(!is.na(EcogSPTotal_cut)),
        fill = "Legend Title") +
   theme_minimal()
 ```
+
