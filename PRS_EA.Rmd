@@ -306,7 +306,7 @@ The merge(by.x, by.y) function creates a new data frame that only keeps those ro
 
 Based on this plot, we can see a positive relationship between the polygenic score for education attainment and actual years of education. This means that with a higher PGS score comes higher genetic capacity for educational attainment.
 
-We ran Pearson's correlation which resulted in r = 0.286 (p-value < 2.2e-16)
+We ran Pearson's correlation which resulted in r = 0.286 (p-value \< 2.2e-16)
 
 ```{r, echo=FALSE, message=FALSE, results='hide'}
 # Plot PGS EA against Actual EA
@@ -322,8 +322,7 @@ cor.test(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
 
 ## Create Residuals
 
-To get the residual we regressed the polygenic risk score for educational attainment
-against actual EA including the variables SEX & AGE as covariates. The results are depicted in the density plot.
+To get the residual we regressed the polygenic risk score for educational attainment against actual EA including the variables SEX & AGE as covariates. The results are depicted in the density plot.
 
 ```{r, echo=FALSE}
 # Create the residuals given two covariates AGE and Sex
@@ -363,13 +362,11 @@ residual_plot <- ggplot() +
 residual_plot
 ```
 
-It is interesting to see that the residual plot is not normally distributed. 
-**Does this suggest that we should continue using non-parametric analysis 
-techniques?**
+It is interesting to see that the residual plot is not normally distributed. **Does this suggest that we should continue using non-parametric analysis techniques?**
 
 # Survival Analysis
 
-Using the ntile function from dplyr, the lower tertile will be assigned value 1 (~ negative residual), middle tertile value 2 and upper tertile value 3 (~positive residual).
+Using the ntile function from dplyr, the lower tertile will be assigned value 1 (\~ negative residual), middle tertile value 2 and upper tertile value 3 (\~positive residual).
 
 ```{r, echo=FALSE}
 # Divide the standardized residuals into upper, middle and lower quartile
@@ -378,9 +375,9 @@ long_dat$thirtile <- ntile(long_dat$res, 3)
 
 ## Mini-Mental State Examination (MMSE)
 
-"The mini–mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10–18 points) or mild (19–23 points) cognitive impairment." (Wikipedia.org)
+"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19--23 points) cognitive impairment." (Wikipedia.org)
 
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 long_dat$MMSE_cut <- ifelse(long_dat$MMSE < 24, 1, 0)
 
 # Fit the Kaplan-Meier estimator
@@ -430,7 +427,7 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-## Alzheimer's Disease Assessment Scale 
+## Alzheimer's Disease Assessment Scale
 
 ### ADAS11
 
@@ -596,6 +593,10 @@ ggplot(long_dat %>% filter(!is.na(ADASQ4_cut)),
 
 ### CDRSB
 
+"The clinical dementia rating (CDR) scale is commonly used to diagnose dementia due to Alzheimer's disease (AD). The sum of boxes of the CDR (CDR-SB) has recently been emphasized and applied to interventional trials for tracing the progression of cognitive impairment (CI) in the early stages of AD." ([Tzeng et al., 2022](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9537043/))
+
+See [Table 3](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3409562/table/T3/?report=objectonly) for explanation on the staging category ([O'Bryant et al., 2012](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3409562/))
+
 ```{r, echo=FALSE, message=FALSE}
 cvalue$CDRSB <- mean(wide_dat$CDRSB_0, na.rm=TRUE) + 2* sd(wide_dat$CDRSB_0, na.rm = TRUE)
 
@@ -649,10 +650,12 @@ ggplot(long_dat %>% filter(!is.na(CDRSB_cut)),
 
 ### DIGITSCORE
 
-```{r, echo=FALSE, message=FALSE}
-cvalue$DIGITSCOR <- mean(wide_dat$DIGITSCOR_0, na.rm=TRUE) + 2* sd(wide_dat$DIGITSCOR_0, na.rm = TRUE)
+"The DSST (Digit Symbol Substitution Test) is a paper-and-pencil cognitive test presented on a single sheet of paper that requires a subject to match symbols to numbers according to a key located on the top of the page. The subject copies the symbol into spaces below a row of numbers. The number of correct symbols within the allowed time, usually 90 to 120 seconds, constitutes the score." ([Jaeger, 2018](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6291255/)) The lower the scores, the more severe impairment of cognitive function.
 
-long_dat$DIGITSCOR_cut <- ifelse(long_dat$DIGITSCOR > cvalue$DIGITSCOR, 1, 0)
+```{r, echo=FALSE, message=FALSE}
+cvalue$DIGITSCOR <- mean(wide_dat$DIGITSCOR_0, na.rm=TRUE) - 2* sd(wide_dat$DIGITSCOR_0, na.rm = TRUE)
+
+long_dat$DIGITSCOR_cut <- ifelse(long_dat$DIGITSCOR < cvalue$DIGITSCOR, 1, 0)
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- long_dat %>%
@@ -700,113 +703,10 @@ ggplot(long_dat %>% filter(!is.na(DIGITSCOR_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### ECOGPTDIVAT
-
-```{r, echo=FALSE, message=FALSE}
-cvalue$EcogPtDivatt <- mean(wide_dat$EcogPtDivatt_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtDivatt_0, na.rm = TRUE)
-
-long_dat$EcogPtDivatt_cut <- ifelse(long_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
-
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtDivatt <- long_dat %>%
-  filter(thirtile != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = .)
-logrank_test$EcogPtDivatt
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtDivatt_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtDivatt_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile, ncol = 3, 
-             labeller = labeller(thirtile = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-```
-
-### ECOGSPVISPAT
-
-```{r, echo=FALSE, message=FALSE}
-cvalue$EcogSPVisspat <- mean(wide_dat$EcogSPVisspat_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPVisspat_0, na.rm = TRUE)
-
-long_dat$EcogSPVisspat_cut <- ifelse(long_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
-
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPVisspat <- long_dat %>%
-  filter(thirtile != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = .)
-logrank_test$EcogSPVisspat
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPVisspat_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPVisspat_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile, ncol = 3, 
-             labeller = labeller(thirtile = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-```
-
 ### FAQ
+
+The Functional Activities Questionnaire is used to assess an individual's functional abilities in daily living activities. It is a caregiver-based questionnaire that helps evaluate how well a person is able to perform various instrumental activities of daily living (IADLs) and basic activities of daily living (ADLs). (ChatGPT)
+Sum scores (range 0-30). There is no established cut-off score for IADL impairment on the FAQ. A higher score relates to more severe impairment in functional abilities.
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$FAQ <- mean(wide_dat$FAQ_0, na.rm=TRUE) + 2* sd(wide_dat$FAQ_0, na.rm = TRUE)
@@ -968,7 +868,6 @@ ggplot(long_dat %>% filter(!is.na(MOCA_cut)),
 ### Rey-Auditory Verbal Learning Test (RAVLT)
 
 The RAVLT was included as a measure of memory function. In this test, the participants are asked to recall words from a list of 15 nouns immediately after each of five learning trials and after a short and a long delay. Two measures known to be sensitive to cognitive changes in patients with AD were included in the present study: Immediate recall (RAVLT-Im): the number of correct responses across the immediate recall of the five learning trials; percent forgetting (RAVLT-PF): the score on the fifth learning trial minus the score on the long delayed recall, divided by the score obtained on the fifth learning trial. The lower the scores, the more severe impairment of cognitive function.
-
 
 #### RAVLT Forgetting
 
@@ -1236,7 +1135,65 @@ ggplot(long_dat %>% filter(!is.na(TRABSCOR_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Patient's Everyday Cognition (EcogPtLang)
+
+### Patient's Everyday Cognition (EcogPt)
+
+The original version of the ECog is an informant-based measure of cognitively-relevant everyday abilities comprised of 39 items, covering six cognitively-relevant domains: Everyday Memory, Everyday Language, Everyday Visuospatial Abilities, and Everyday Planning, Everyday Organization, and Everyday Divided Attention. Ratings are made on a four-point scale: 1 = better or no change compared to 10 years earlier, 2 = questionable/occasionally worse, 3 = consistently a little worse, 4 = consistently much worse. ([Tomaszewski Farias et al., 2012](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3211103/))
+
+#### EcogPt Everyday Divided Attention
+
+```{r, echo=FALSE, message=FALSE}
+cvalue$EcogPtDivatt <- mean(wide_dat$EcogPtDivatt_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtDivatt_0, na.rm = TRUE)
+
+long_dat$EcogPtDivatt_cut <- ifelse(long_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = .)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10)) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+logrank_test$EcogPtDivatt <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile, data = .)
+logrank_test$EcogPtDivatt
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtDivatt_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtDivatt_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+```
+
+#### EcogPt Everyday Language
 
 ```{r, echo=FALSE}
 cvalue$EcogPtLang <- mean(wide_dat$EcogPtLang_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtLang_0, na.rm = TRUE)
@@ -1289,7 +1246,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtLang_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Patient's Everyday Cognition (EcogPtMem)
+#### EcogPt Everyday Memory
 
 ```{r, echo=FALSE}
 cvalue$EcogPtMem <- mean(wide_dat$EcogPtMem_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtMem_0, na.rm = TRUE)
@@ -1342,7 +1299,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtMem_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Patient's Everyday Cognition (EcogPtOrgan)
+#### EcogPt Everyday Organization
 
 ```{r, echo=FALSE}
 cvalue$EcogPtOrgan <- mean(wide_dat$EcogPtOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtOrgan_0, na.rm = TRUE)
@@ -1395,7 +1352,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtOrgan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Patient's Everyday Cognition (EcogPtPlan)
+#### EcogPt Everyday Planning
 
 ```{r, echo=FALSE}
 cvalue$EcogPtPlan <- mean(wide_dat$EcogPtPlan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtPlan_0, na.rm = TRUE)
@@ -1448,60 +1405,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtPlan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Patient's Everyday Cognition (EcogPtTotal)
-
-```{r, echo=FALSE}
-cvalue$EcogPtTotal <- mean(wide_dat$EcogPtTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtTotal_0, na.rm = TRUE)
-
-long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
-
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtTotal <- long_dat %>%
-  filter(thirtile != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = .)
-logrank_test$EcogPtTotal
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtTotal_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile, ncol = 3, 
-             labeller = labeller(thirtile = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-```
-
-### Patient's Everyday Cognition (EcogPtVisspat)
+#### EcogPt Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE}
 cvalue$EcogPtVisspat <- mean(wide_dat$EcogPtVisspat_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtVisspat_0, na.rm = TRUE)
@@ -1554,7 +1458,64 @@ ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPDivatt)
+
+#### EcogPt Total ???
+
+```{r, echo=FALSE}
+cvalue$EcogPtTotal <- mean(wide_dat$EcogPtTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtTotal_0, na.rm = TRUE)
+
+long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = .)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10)) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+logrank_test$EcogPtTotal <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile, data = .)
+logrank_test$EcogPtTotal
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogPtTotal_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+```
+
+
+### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
+
+#### EcogSP Everyday Divided Attention
 
 ```{r, echo=FALSE}
 cvalue$EcogSPDivatt <- mean(wide_dat$EcogSPDivatt_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPDivatt_0, na.rm = TRUE)
@@ -1607,7 +1568,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPDivatt_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPLang)
+#### EcogSP Everyday Language
 
 ```{r, echo=FALSE}
 cvalue$EcogSPLang <- mean(wide_dat$EcogSPLang_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPLang_0, na.rm = TRUE)
@@ -1660,7 +1621,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPLang_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPMem)
+#### EcogSP Everyday Memory
 
 ```{r, echo=FALSE}
 cvalue$EcogSPMem <- mean(wide_dat$EcogSPMem_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPMem_0, na.rm = TRUE)
@@ -1713,7 +1674,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPMem_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPOrgan)
+#### EcogSP Everyday Organization
 
 ```{r, echo=FALSE}
 cvalue$EcogSPOrgan <- mean(wide_dat$EcogSPOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPOrgan_0, na.rm = TRUE)
@@ -1766,7 +1727,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPOrgan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPPlan)
+#### EcogSP Everyday Planning
 
 ```{r, echo=FALSE}
 cvalue$EcogSPPlan <- mean(wide_dat$EcogSPPlan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPPlan_0, na.rm = TRUE)
@@ -1819,7 +1780,60 @@ ggplot(long_dat %>% filter(!is.na(EcogSPPlan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSPTotal)
+#### EcogSP Everyday Visuospatial Abilities
+
+```{r, echo=FALSE, message=FALSE}
+cvalue$EcogSPVisspat <- mean(wide_dat$EcogSPVisspat_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPVisspat_0, na.rm = TRUE)
+
+long_dat$EcogSPVisspat_cut <- ifelse(long_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = .)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10)) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+logrank_test$EcogSPVisspat <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile, data = .)
+logrank_test$EcogSPVisspat
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(EcogSPVisspat_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(EcogSPVisspat_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+```
+
+#### EcogSP Total ???
 
 ```{r, echo=FALSE}
 cvalue$EcogSPTotal <- mean(wide_dat$EcogSPTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPTotal_0, na.rm = TRUE)
@@ -1871,4 +1885,3 @@ ggplot(long_dat %>% filter(!is.na(EcogSPTotal_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
-
