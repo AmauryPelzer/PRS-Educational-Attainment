@@ -817,7 +817,7 @@ ggplot(long_dat %>% filter(!is.na(LDELTOTAL_cut)),
 Reference literature: doi: 10.1111/j.1532-5415.2005.53221.x
 
 ```{r, echo=FALSE, message=FALSE}
-long_dat$MOCA_cut <- ifelse(long_dat$MOCA > 26, 1, 0)
+long_dat$MOCA_cut <- ifelse(long_dat$MOCA < 26, 1, 0)
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- long_dat %>%
@@ -1885,3 +1885,11 @@ ggplot(long_dat %>% filter(!is.na(EcogSPTotal_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
+
+```{r}
+test <- long_dat %>% filter(AGE %in% 60:70)
+
+# also test # people 65 to 75
+
+```
+
