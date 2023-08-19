@@ -11,6 +11,7 @@ if (suppressWarnings(!require(data.table))) {install.packages("data.table"); lib
 if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
 if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
 if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
+if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
 ```
 
 # Data Preprocessing
@@ -349,30 +350,8 @@ cor.test(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
 ## Check linear regression assumptions
 
 ```{r}
-library(ggplot2)
-library(lmtest)
-
-if (suppressWarnings(!require(lmtest))) {install.packages("lmtest"); library(lmtest)}
-
+# Linear regression model
 model <- lm(PTEDUCAT~EA22+AGE+PTGENDER,data=long_dat)
-
-# Check assumptions
-# Normality assumption
-qqPlot(model, id.method = "identify")
-
-# Homoscedasticity assumption
-plot(model, which = 3)
-
-# Heteroscedasticity test
-ncvTest(model)
-
-# Functional form test
-resettest(model)
-  
-# You can also create your own customized diagnostic plots using ggplot2
-ggplot(data = model$residuals, aes(x = fitted(model), y = .)) +
-  geom_point() +
-  geom_smooth()
 
 # Check model assumptions
 check_model(model)
@@ -441,7 +420,7 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE < 24, 1, 0)
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
+  filter(as.integer(VISCODE) <= 9, AGE>59, AGE<71) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile, data = .)
 
 # Create the Kaplan-Meier survival plot
@@ -672,7 +651,7 @@ ggplot(long_dat %>% filter(!is.na(ADASQ4_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### CDRSB
+## CDRSB
 
 "The clinical dementia rating (CDR) scale is commonly used to diagnose dementia due to Alzheimer's disease (AD). The sum of boxes of the CDR (CDR-SB) has recently been emphasized and applied to interventional trials for tracing the progression of cognitive impairment (CI) in the early stages of AD." ([Tzeng et al., 2022](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9537043/))
 
@@ -729,7 +708,7 @@ ggplot(long_dat %>% filter(!is.na(CDRSB_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### DIGITSCORE
+## DIGITSCORE
 
 "The DSST (Digit Symbol Substitution Test) is a paper-and-pencil cognitive test presented on a single sheet of paper that requires a subject to match symbols to numbers according to a key located on the top of the page. The subject copies the symbol into spaces below a row of numbers. The number of correct symbols within the allowed time, usually 90 to 120 seconds, constitutes the score." ([Jaeger, 2018](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6291255/)) The lower the scores, the more severe impairment of cognitive function.
 
@@ -789,7 +768,7 @@ ggplot(long_dat %>% filter(!is.na(DIGITSCOR_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### FAQ
+## FAQ
 
 The Functional Activities Questionnaire is used to assess an individual's functional abilities in daily living activities. It is a caregiver-based questionnaire that helps evaluate how well a person is able to perform various instrumental activities of daily living (IADLs) and basic activities of daily living (ADLs). (ChatGPT)
 Sum scores (range 0-30). The score range for each item is 0–3 (higher scores indicate greater impairment; 0 = normal or never did but could do now; 1 = has difficulty but does by self or never did but would have difficulty now; 2 = requires assistance; 3 = dependent). There is no established cut-off score for IADL impairment on the FAQ. However, one study reported that a total FAQ score (sum of all 10 item scores; range 0–30) of ≥ 6 is suggestive of functional impairment [ [20](https://pubmed.ncbi.nlm.nih.gov/15592138/)]. ([Marshall et al., 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4448081/))
@@ -845,7 +824,7 @@ ggplot(long_dat %>% filter(!is.na(FAQ_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### LDELTOTAL
+## LDELTOTAL
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$LDELTOTAL <- wide_dat %>%
@@ -903,7 +882,7 @@ ggplot(long_dat %>% filter(!is.na(LDELTOTAL_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### MOCA
+## MOCA
 
 Reference literature: doi: 10.1111/j.1532-5415.2005.53221.x
 
@@ -956,11 +935,126 @@ ggplot(long_dat %>% filter(!is.na(MOCA_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-### Rey-Auditory Verbal Learning Test (RAVLT)
+## Rey-Auditory Verbal Learning Test (RAVLT)
 
 The RAVLT was included as a measure of memory function. In this test, the participants are asked to recall words from a list of 15 nouns immediately after each of five learning trials and after a short and a long delay. Two measures known to be sensitive to cognitive changes in patients with AD were included in the present study: Immediate recall (RAVLT-Im): the number of correct responses across the immediate recall of the five learning trials; percent forgetting (RAVLT-PF): the score on the fifth learning trial minus the score on the long delayed recall, divided by the score obtained on the fifth learning trial. The lower the scores, the more severe impairment of cognitive function.
 
-#### RAVLT Forgetting
+Different summary scores are derived from raw RAVLT scores. These include RAVLT Immediate (the sum of scores from 5 first trials (Trials 1 to 5)), RAVLT Learning (the score of Trial 5 minus the score of Trial 1), RAVLT Forgetting (the score of Trial 5 minus score of the delayed recall) and RAVLT Percent Forgetting (RAVLT Forgetting divided by the score of Trial 5). We use naming of the ADNI merge table3 for these summary measures. We investigated the relationship between MRI measures and RAVLT cognitive test scores by estimating the RAVLT Immediate and RAVLT Percent Forgetting from the gray matter density. These two summary scores were selected since they highlight different aspects of episodic memory, learning (RAVLT Immediate) and delayed memory (RAVLT Percent forgetting), essential to AD and previous studies (Estévez-González et al., 2003, Wang et al., 2011, Gomar et al., 2014, Moradi et al., 2015) have indicated strong relationships between these two RAVLT measures and Alzheimer's disease.
+
+
+### RAVLT Immediate
+
+```{r, echo=FALSE, message=FALSE}
+cvalue$RAVLT_immediate <- wide_dat %>%
+    filter(DX_0 == "CN") %>%
+    summarize(
+      value := mean(RAVLT_immediate_0, na.rm = TRUE) - 2 * sd(RAVLT_immediate_0, na.rm = TRUE)
+    ) %>%
+    pull(value)
+
+long_dat$RAVLT_immediate_cut <- ifelse(long_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = .)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10)) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+logrank_test$RAVLT_immediate <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = .)
+logrank_test$RAVLT_immediate
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(RAVLT_immediate_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(RAVLT_immediate_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+```
+
+
+### RAVLT Percentage Forgetting
+
+```{r, echo=FALSE, message=FALSE}
+cvalue$RAVLT_perc_forgetting <- calculate_cvalue(RAVLT_perc_forgetting)
+
+long_dat$RAVLT_perc_forgetting_cut <- ifelse(long_dat$RAVLT_perc_forgetting > cvalue$RAVLT_perc_forgetting, 1, 0)
+
+# Fit the Kaplan-Meier estimator
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9) %>%
+  survfit(Surv(as.integer(VISCODE), RAVLT_perc_forgetting_cut) ~ thirtile, data = .)
+
+# Create the Kaplan-Meier survival plot
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10)) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+logrank_test$RAVLT_perc_forgetting <- long_dat %>%
+  filter(thirtile != 2) %>%
+  survdiff(Surv(as.integer(VISCODE), RAVLT_perc_forgetting_cut) ~ thirtile, data = .)
+logrank_test$RAVLT_perc_forgetting
+
+# Histogram depicting the number of people measured at each time point by group by outcome
+ggplot(long_dat %>% filter(!is.na(RAVLT_perc_forgetting_cut)), 
+       aes(x = as.integer(VISCODE), fill = factor(RAVLT_perc_forgetting_cut))) +
+  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
+  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
+  facet_wrap(~ thirtile, ncol = 3, 
+             labeller = labeller(thirtile = c("1" = "Underperformed", 
+                                              "2" = "Average", 
+                                              "3" = "Overperformed"))) +
+  labs(title = "Number of observations by time by group by outcome",
+       x = "Time", y = "Number of participants",
+       fill = "Legend Title") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+```
+
+### RAVLT Forgetting
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_forgetting <- calculate_cvalue(RAVLT_forgetting)
@@ -1013,60 +1107,7 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_forgetting_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### RAVLT Immediate
-
-```{r, echo=FALSE, message=FALSE}
-cvalue$RAVLT_immediate <- calculate_cvalue(RAVLT_immediate)
-
-long_dat$RAVLT_immediate_cut <- ifelse(long_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
-
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$RAVLT_immediate <- long_dat %>%
-  filter(thirtile != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile, data = .)
-logrank_test$RAVLT_immediate
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(RAVLT_immediate_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(RAVLT_immediate_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile, ncol = 3, 
-             labeller = labeller(thirtile = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-```
-
-#### RAVLT Learning
+### RAVLT Learning
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_learning <- calculate_cvalue(RAVLT_learning)
@@ -1120,60 +1161,13 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_learning_cut)),
 
 ```
 
-#### RAVLT Percentage Forgetting
+## TRABSCORE
 
-```{r, echo=FALSE, message=FALSE}
-cvalue$RAVLT_perc_forgetting <- calculate_cvalue(RAVLT_perc_forgetting)
+The Trail Making Test is a neuropsychological test of visual attention and task switching. It has two parts, in which the subject is instructed to connect a set of 25 dots as quickly as possible while maintaining accuracy.
 
-long_dat$RAVLT_perc_forgetting_cut <- ifelse(long_dat$RAVLT_perc_forgetting > cvalue$RAVLT_perc_forgetting, 1, 0)
+The test can provide information about visual search speed, scanning, speed of processing, mental flexibility, and executive functioning. It is sensitive to cognitive impairment associated with dementia, including Alzheimer's disease. (ChatGPT)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), RAVLT_perc_forgetting_cut) ~ thirtile, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$RAVLT_perc_forgetting <- long_dat %>%
-  filter(thirtile != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), RAVLT_perc_forgetting_cut) ~ thirtile, data = .)
-logrank_test$RAVLT_perc_forgetting
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(RAVLT_perc_forgetting_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(RAVLT_perc_forgetting_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile, ncol = 3, 
-             labeller = labeller(thirtile = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-```
-
-### TRABSCORE
+Record the total number of seconds to complete Part B (*Trails B*), up to a maximum of 300 seconds. If the participant is not finished by 300 seconds, the score is 300.
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$TRABSCOR <- calculate_cvalue(TRABSCOR)
