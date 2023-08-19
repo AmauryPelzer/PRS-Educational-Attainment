@@ -192,6 +192,32 @@ wide_dat <- pivot_wider(
 head(wide_dat)
 ```
 
+# Age Distribution in Data Frame
+
+```{r, echo=FALSE, warning=FALSE}
+
+# Create histogram of general age range in data set
+
+ggplot(long_dat %>% distinct(RID, .keep_all = TRUE), aes(x = AGE)) +
+  geom_histogram(binwidth = 1, fill = "#bbceed", color = "black") +
+  geom_vline(xintercept = c(60, 70), linetype = "dashed", color = "#940914", size=1) +  # vertical lines age range
+  geom_vline(xintercept = c(65, 75), linetype = "dashed", color = "#940914", size=1) +  # vertical lines age range
+  labs(title = "Histogram Age Distribution",
+       x = "Age",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),  # Bold and centred title
+        axis.line = element_line(size = 0.5))  # Thicker axis lines
+
+# create data frames of two age groups
+
+age_60to70_df <- long_dat %>% # Data frame filtered for age
+  filter(AGE >= 60 & AGE <= 70)
+
+age_65to75_df <- long_dat %>% # Data frame filtered for age
+  filter(AGE >= 65 & AGE <= 75)
+```
+
 # Attrition Analysis
 
 Based on the number of participants measured at any time point I made a frequency plot to get a first idea of the sampling frequency.
@@ -433,7 +459,21 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue <- list()
-cvalue$ADAS11 <- mean(wide_dat$ADAS11_0, na.rm=TRUE) + 2* sd(wide_dat$ADAS11_0, na.rm = TRUE)
+
+calculate_cvalue <- function(variable) {
+  var_bl <- paste0(deparse(substitute(variable)), "_0")
+  
+  value <- wide_dat %>%
+    filter(DX_0 == "CN") %>%
+    summarize(
+      {{ variable }} := mean(.[[ var_bl ]], na.rm = TRUE) + 2 * sd(.[[ var_bl ]], na.rm = TRUE)
+    ) %>%
+    pull({{ variable }})  # Extract the calculated value
+    
+  return(value)
+}
+
+cvalue$ADAS11 <- calculate_cvalue(ADAS11)
 
 long_dat$ADAS11_cut <- ifelse(long_dat$ADAS11 > cvalue$ADAS11, 1, 0)
 
@@ -488,7 +528,7 @@ ggplot(long_dat %>% filter(!is.na(ADAS11_cut)),
 "The ADAS13 was included as a global measure of cognitive function. ADAS13 is a test battery developed to assess severity of cognitive impairment associated with AD and includes subtests and clinical evaluations assessing memory function, reasoning, language function, orientation and praxis. The ADAS13 is a modified version of the original ADAS-Cog-11, adding a cancellation task and a delayed free recall task. The higher the scores, the more severe impairment of cognitive function." (Mofrad et al., 2021)
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$ADAS13 <- mean(wide_dat$ADAS13_0, na.rm=TRUE) + 2* sd(wide_dat$ADAS13_0, na.rm = TRUE)
+cvalue$ADAS13 <- calculate_cvalue(ADAS13)
 
 long_dat$ADAS13_cut <- ifelse(long_dat$ADAS13 > cvalue$ADAS13, 1, 0)
 
@@ -541,7 +581,7 @@ ggplot(long_dat %>% filter(!is.na(ADAS13_cut)),
 ### ADASQ4
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$ADASQ4 <- mean(wide_dat$ADASQ4_0, na.rm=TRUE) + 2* sd(wide_dat$ADASQ4_0, na.rm = TRUE)
+cvalue$ADASQ4 <- calculate_cvalue(ADASQ4)
 
 long_dat$ADASQ4_cut <- ifelse(long_dat$ADASQ4 > cvalue$ADASQ4, 1, 0)
 
@@ -598,7 +638,7 @@ ggplot(long_dat %>% filter(!is.na(ADASQ4_cut)),
 See [Table 3](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3409562/table/T3/?report=objectonly) for explanation on the staging category ([O'Bryant et al., 2012](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3409562/))
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$CDRSB <- mean(wide_dat$CDRSB_0, na.rm=TRUE) + 2* sd(wide_dat$CDRSB_0, na.rm = TRUE)
+cvalue$CDRSB <- calculate_cvalue(CDRSB)
 
 long_dat$CDRSB_cut <- ifelse(long_dat$CDRSB > cvalue$CDRSB, 1, 0)
 
