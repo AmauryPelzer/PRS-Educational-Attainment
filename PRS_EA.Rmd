@@ -346,6 +346,39 @@ cor(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
 cor.test(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
 ```
 
+## Check linear regression assumptions
+
+```{r}
+library(ggplot2)
+library(lmtest)
+
+if (suppressWarnings(!require(lmtest))) {install.packages("lmtest"); library(lmtest)}
+
+model <- lm(PTEDUCAT~EA22+AGE+PTGENDER,data=long_dat)
+
+# Check assumptions
+# Normality assumption
+qqPlot(model, id.method = "identify")
+
+# Homoscedasticity assumption
+plot(model, which = 3)
+
+# Heteroscedasticity test
+ncvTest(model)
+
+# Functional form test
+resettest(model)
+  
+# You can also create your own customized diagnostic plots using ggplot2
+ggplot(data = model$residuals, aes(x = fitted(model), y = .)) +
+  geom_point() +
+  geom_smooth()
+
+# Check model assumptions
+check_model(model)
+```
+
+
 ## Create Residuals
 
 To get the residual we regressed the polygenic risk score for educational attainment against actual EA including the variables SEX & AGE as covariates. The results are depicted in the density plot.
@@ -454,6 +487,14 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
 ```
 
 ## Alzheimer's Disease Assessment Scale
+
+The Cognitive Subscale Alzheimer's Disease Assessment Scale (ADAS) is made of 11 tasks that include both subject-completed tests and observer-based assessments, assessing the memory, language, and praxis domains. The result is a global final score ranging from 0 to 70, based on the sum of the scores of the single tasks (ADAS11).
+
+Beyond the ADAS11 score, the ADNI study included also an additional test of delayed word recall and a number cancellation or maze task, which are further summed to have a new total score that ranges from 0 to 85 (ADAS13).
+
+In addition, the score of the task 4 (Word Recognition, ADASQ4) was included in the ADNIMERGE dataset.
+
+([Grassi et al., 2019](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6646724/))
 
 ### ADAS11
 
@@ -751,10 +792,10 @@ ggplot(long_dat %>% filter(!is.na(DIGITSCOR_cut)),
 ### FAQ
 
 The Functional Activities Questionnaire is used to assess an individual's functional abilities in daily living activities. It is a caregiver-based questionnaire that helps evaluate how well a person is able to perform various instrumental activities of daily living (IADLs) and basic activities of daily living (ADLs). (ChatGPT)
-Sum scores (range 0-30). There is no established cut-off score for IADL impairment on the FAQ. A higher score relates to more severe impairment in functional abilities.
+Sum scores (range 0-30). The score range for each item is 0–3 (higher scores indicate greater impairment; 0 = normal or never did but could do now; 1 = has difficulty but does by self or never did but would have difficulty now; 2 = requires assistance; 3 = dependent). There is no established cut-off score for IADL impairment on the FAQ. However, one study reported that a total FAQ score (sum of all 10 item scores; range 0–30) of ≥ 6 is suggestive of functional impairment [ [20](https://pubmed.ncbi.nlm.nih.gov/15592138/)]. ([Marshall et al., 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4448081/))
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$FAQ <- calculate_cvalue(FAQ)
+cvalue$FAQ <- 5
 
 long_dat$FAQ_cut <- ifelse(long_dat$FAQ > cvalue$FAQ, 1, 0)
 
@@ -807,9 +848,14 @@ ggplot(long_dat %>% filter(!is.na(FAQ_cut)),
 ### LDELTOTAL
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$LDELTOTAL <- calculate_cvalue(LDELTOTAL)
+cvalue$LDELTOTAL <- wide_dat %>%
+    filter(DX_0 == "CN") %>%
+    summarize(
+      value := mean(LDELTOTAL_0, na.rm = TRUE) - 2 * sd(LDELTOTAL_0, na.rm = TRUE)
+    ) %>%
+    pull(value)
 
-long_dat$LDELTOTAL_cut <- ifelse(long_dat$LDELTOTAL > cvalue$LDELTOTAL, 1, 0)
+long_dat$LDELTOTAL_cut <- ifelse(long_dat$LDELTOTAL < cvalue$LDELTOTAL, 1, 0)
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- long_dat %>%
@@ -1181,11 +1227,11 @@ ggplot(long_dat %>% filter(!is.na(TRABSCOR_cut)),
 ```
 
 
-### Patient's Everyday Cognition (EcogPt)
+## Patient's Everyday Cognition (EcogPt)
 
 The original version of the ECog is an informant-based measure of cognitively-relevant everyday abilities comprised of 39 items, covering six cognitively-relevant domains: Everyday Memory, Everyday Language, Everyday Visuospatial Abilities, and Everyday Planning, Everyday Organization, and Everyday Divided Attention. Ratings are made on a four-point scale: 1 = better or no change compared to 10 years earlier, 2 = questionable/occasionally worse, 3 = consistently a little worse, 4 = consistently much worse. ([Tomaszewski Farias et al., 2012](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3211103/))
 
-#### EcogPt Everyday Divided Attention
+### EcogPt Everyday Divided Attention
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$EcogPtDivatt <- calculate_cvalue(EcogPtDivatt)
@@ -1238,7 +1284,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtDivatt_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogPt Everyday Language
+### EcogPt Everyday Language
 
 ```{r, echo=FALSE}
 cvalue$EcogPtLang <- calculate_cvalue(EcogPtLang)
@@ -1291,7 +1337,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtLang_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogPt Everyday Memory
+### EcogPt Everyday Memory
 
 ```{r, echo=FALSE}
 cvalue$EcogPtMem <- calculate_cvalue(EcogPtMem)
@@ -1344,7 +1390,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtMem_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogPt Everyday Organization
+### EcogPt Everyday Organization
 
 ```{r, echo=FALSE}
 cvalue$EcogPtOrgan <- calculate_cvalue(EcogPtOrgan)
@@ -1397,7 +1443,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtOrgan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogPt Everyday Planning
+### EcogPt Everyday Planning
 
 ```{r, echo=FALSE}
 cvalue$EcogPtPlan <- calculate_cvalue(EcogPtPlan)
@@ -1450,7 +1496,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtPlan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogPt Everyday Visuospatial Abilities
+### EcogPt Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE}
 cvalue$EcogPtVisspat <- calculate_cvalue(EcogPtVisspat)
@@ -1504,7 +1550,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)),
 ```
 
 
-#### EcogPt Total ???
+### EcogPt Total ???
 
 ```{r, echo=FALSE}
 cvalue$EcogPtTotal <- calculate_cvalue(EcogPtTotal)
@@ -1558,9 +1604,9 @@ ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)),
 ```
 
 
-### Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
+## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
 
-#### EcogSP Everyday Divided Attention
+### EcogSP Everyday Divided Attention
 
 ```{r, echo=FALSE}
 cvalue$EcogSPDivatt <- calculate_cvalue(EcogSPDivatt)
@@ -1613,7 +1659,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPDivatt_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogSP Everyday Language
+### EcogSP Everyday Language
 
 ```{r, echo=FALSE}
 cvalue$EcogSPLang <- calculate_cvalue(EcogSPLang)
@@ -1666,7 +1712,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPLang_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogSP Everyday Memory
+### EcogSP Everyday Memory
 
 ```{r, echo=FALSE}
 cvalue$EcogSPMem <- calculate_cvalue(EcogSPMem)
@@ -1719,7 +1765,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPMem_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogSP Everyday Organization
+### EcogSP Everyday Organization
 
 ```{r, echo=FALSE}
 cvalue$EcogSPOrgan <- calculate_cvalue(EcogSPOrgan)
@@ -1772,7 +1818,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPOrgan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogSP Everyday Planning
+### EcogSP Everyday Planning
 
 ```{r, echo=FALSE}
 cvalue$EcogSPPlan <- calculate_cvalue(EcogSPPlan)
@@ -1825,7 +1871,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPPlan_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogSP Everyday Visuospatial Abilities
+### EcogSP Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$EcogSPVisspat <- calculate_cvalue(EcogSPVisspat)
@@ -1878,7 +1924,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPVisspat_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-#### EcogSP Total ???
+### EcogSP Total ???
 
 ```{r, echo=FALSE}
 cvalue$EcogSPTotal <- calculate_cvalue(EcogSPTotal)
