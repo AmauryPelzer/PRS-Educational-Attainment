@@ -693,7 +693,12 @@ ggplot(long_dat %>% filter(!is.na(CDRSB_cut)),
 "The DSST (Digit Symbol Substitution Test) is a paper-and-pencil cognitive test presented on a single sheet of paper that requires a subject to match symbols to numbers according to a key located on the top of the page. The subject copies the symbol into spaces below a row of numbers. The number of correct symbols within the allowed time, usually 90 to 120 seconds, constitutes the score." ([Jaeger, 2018](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6291255/)) The lower the scores, the more severe impairment of cognitive function.
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$DIGITSCOR <- mean(wide_dat$DIGITSCOR_0, na.rm=TRUE) - 2* sd(wide_dat$DIGITSCOR_0, na.rm = TRUE)
+cvalue$DIGITSCOR <- wide_dat %>%
+    filter(DX_0 == "CN") %>%
+    summarize(
+      value := mean(DIGITSCOR_0, na.rm = TRUE) - 2 * sd(DIGITSCOR_0, na.rm = TRUE)
+    ) %>%
+    pull(value)
 
 long_dat$DIGITSCOR_cut <- ifelse(long_dat$DIGITSCOR < cvalue$DIGITSCOR, 1, 0)
 
@@ -749,7 +754,7 @@ The Functional Activities Questionnaire is used to assess an individual's functi
 Sum scores (range 0-30). There is no established cut-off score for IADL impairment on the FAQ. A higher score relates to more severe impairment in functional abilities.
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$FAQ <- mean(wide_dat$FAQ_0, na.rm=TRUE) + 2* sd(wide_dat$FAQ_0, na.rm = TRUE)
+cvalue$FAQ <- calculate_cvalue(FAQ)
 
 long_dat$FAQ_cut <- ifelse(long_dat$FAQ > cvalue$FAQ, 1, 0)
 
@@ -802,7 +807,7 @@ ggplot(long_dat %>% filter(!is.na(FAQ_cut)),
 ### LDELTOTAL
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$LDELTOTAL <- mean(wide_dat$LDELTOTAL_0, na.rm=TRUE) + 2* sd(wide_dat$LDELTOTAL_0, na.rm = TRUE)
+cvalue$LDELTOTAL <- calculate_cvalue(LDELTOTAL)
 
 long_dat$LDELTOTAL_cut <- ifelse(long_dat$LDELTOTAL > cvalue$LDELTOTAL, 1, 0)
 
@@ -912,7 +917,7 @@ The RAVLT was included as a measure of memory function. In this test, the partic
 #### RAVLT Forgetting
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$RAVLT_forgetting <- mean(wide_dat$RAVLT_forgetting_0, na.rm=TRUE) + 2* sd(wide_dat$RAVLT_forgetting_0, na.rm = TRUE)
+cvalue$RAVLT_forgetting <- calculate_cvalue(RAVLT_forgetting)
 
 long_dat$RAVLT_forgetting_cut <- ifelse(long_dat$RAVLT_forgetting > cvalue$RAVLT_forgetting, 1, 0)
 
@@ -965,7 +970,7 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_forgetting_cut)),
 #### RAVLT Immediate
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$RAVLT_immediate <- mean(wide_dat$RAVLT_immediate_0, na.rm=TRUE) + 2* sd(wide_dat$RAVLT_immediate_0, na.rm = TRUE)
+cvalue$RAVLT_immediate <- calculate_cvalue(RAVLT_immediate)
 
 long_dat$RAVLT_immediate_cut <- ifelse(long_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
 
@@ -1018,7 +1023,7 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_immediate_cut)),
 #### RAVLT Learning
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$RAVLT_learning <- mean(wide_dat$RAVLT_learning_0, na.rm=TRUE) + 2* sd(wide_dat$RAVLT_learning_0, na.rm = TRUE)
+cvalue$RAVLT_learning <- calculate_cvalue(RAVLT_learning)
 
 long_dat$RAVLT_learning_cut <- ifelse(long_dat$RAVLT_learning > cvalue$RAVLT_learning, 1, 0)
 
@@ -1072,7 +1077,7 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_learning_cut)),
 #### RAVLT Percentage Forgetting
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$RAVLT_perc_forgetting <- mean(wide_dat$RAVLT_perc_forgetting_0, na.rm=TRUE) + 2* sd(wide_dat$RAVLT_perc_forgetting_0, na.rm = TRUE)
+cvalue$RAVLT_perc_forgetting <- calculate_cvalue(RAVLT_perc_forgetting)
 
 long_dat$RAVLT_perc_forgetting_cut <- ifelse(long_dat$RAVLT_perc_forgetting > cvalue$RAVLT_perc_forgetting, 1, 0)
 
@@ -1125,7 +1130,7 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_perc_forgetting_cut)),
 ### TRABSCORE
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$TRABSCOR <- mean(wide_dat$TRABSCOR_0, na.rm=TRUE) + 2* sd(wide_dat$TRABSCOR_0, na.rm = TRUE)
+cvalue$TRABSCOR <- calculate_cvalue(TRABSCOR)
 
 long_dat$TRABSCOR_cut <- ifelse(long_dat$TRABSCOR > cvalue$TRABSCOR, 1, 0)
 
@@ -1183,7 +1188,7 @@ The original version of the ECog is an informant-based measure of cognitively-re
 #### EcogPt Everyday Divided Attention
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$EcogPtDivatt <- mean(wide_dat$EcogPtDivatt_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtDivatt_0, na.rm = TRUE)
+cvalue$EcogPtDivatt <- calculate_cvalue(EcogPtDivatt)
 
 long_dat$EcogPtDivatt_cut <- ifelse(long_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
 
@@ -1236,7 +1241,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtDivatt_cut)),
 #### EcogPt Everyday Language
 
 ```{r, echo=FALSE}
-cvalue$EcogPtLang <- mean(wide_dat$EcogPtLang_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtLang_0, na.rm = TRUE)
+cvalue$EcogPtLang <- calculate_cvalue(EcogPtLang)
 
 long_dat$EcogPtLang_cut <- ifelse(long_dat$EcogPtLang > cvalue$EcogPtLang, 1, 0)
 
@@ -1289,7 +1294,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtLang_cut)),
 #### EcogPt Everyday Memory
 
 ```{r, echo=FALSE}
-cvalue$EcogPtMem <- mean(wide_dat$EcogPtMem_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtMem_0, na.rm = TRUE)
+cvalue$EcogPtMem <- calculate_cvalue(EcogPtMem)
 
 long_dat$EcogPtMem_cut <- ifelse(long_dat$EcogPtMem > cvalue$EcogPtMem, 1, 0)
 
@@ -1342,7 +1347,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtMem_cut)),
 #### EcogPt Everyday Organization
 
 ```{r, echo=FALSE}
-cvalue$EcogPtOrgan <- mean(wide_dat$EcogPtOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtOrgan_0, na.rm = TRUE)
+cvalue$EcogPtOrgan <- calculate_cvalue(EcogPtOrgan)
 
 long_dat$EcogPtOrgan_cut <- ifelse(long_dat$EcogPtOrgan > cvalue$EcogPtOrgan, 1, 0)
 
@@ -1395,7 +1400,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtOrgan_cut)),
 #### EcogPt Everyday Planning
 
 ```{r, echo=FALSE}
-cvalue$EcogPtPlan <- mean(wide_dat$EcogPtPlan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtPlan_0, na.rm = TRUE)
+cvalue$EcogPtPlan <- calculate_cvalue(EcogPtPlan)
 
 long_dat$EcogPtPlan_cut <- ifelse(long_dat$EcogPtPlan > cvalue$EcogPtPlan, 1, 0)
 
@@ -1448,7 +1453,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtPlan_cut)),
 #### EcogPt Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE}
-cvalue$EcogPtVisspat <- mean(wide_dat$EcogPtVisspat_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtVisspat_0, na.rm = TRUE)
+cvalue$EcogPtVisspat <- calculate_cvalue(EcogPtVisspat)
 
 long_dat$EcogPtVisspat_cut <- ifelse(long_dat$EcogPtVisspat > cvalue$EcogPtVisspat, 1, 0)
 
@@ -1502,7 +1507,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)),
 #### EcogPt Total ???
 
 ```{r, echo=FALSE}
-cvalue$EcogPtTotal <- mean(wide_dat$EcogPtTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogPtTotal_0, na.rm = TRUE)
+cvalue$EcogPtTotal <- calculate_cvalue(EcogPtTotal)
 
 long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
 
@@ -1558,7 +1563,7 @@ ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)),
 #### EcogSP Everyday Divided Attention
 
 ```{r, echo=FALSE}
-cvalue$EcogSPDivatt <- mean(wide_dat$EcogSPDivatt_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPDivatt_0, na.rm = TRUE)
+cvalue$EcogSPDivatt <- calculate_cvalue(EcogSPDivatt)
 
 long_dat$EcogSPDivatt_cut <- ifelse(long_dat$EcogSPDivatt > cvalue$EcogSPDivatt, 1, 0)
 
@@ -1611,7 +1616,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPDivatt_cut)),
 #### EcogSP Everyday Language
 
 ```{r, echo=FALSE}
-cvalue$EcogSPLang <- mean(wide_dat$EcogSPLang_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPLang_0, na.rm = TRUE)
+cvalue$EcogSPLang <- calculate_cvalue(EcogSPLang)
 
 long_dat$EcogSPLang_cut <- ifelse(long_dat$EcogSPLang > cvalue$EcogSPLang, 1, 0)
 
@@ -1664,7 +1669,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPLang_cut)),
 #### EcogSP Everyday Memory
 
 ```{r, echo=FALSE}
-cvalue$EcogSPMem <- mean(wide_dat$EcogSPMem_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPMem_0, na.rm = TRUE)
+cvalue$EcogSPMem <- calculate_cvalue(EcogSPMem)
 
 long_dat$EcogSPMem_cut <- ifelse(long_dat$EcogSPMem > cvalue$EcogSPMem, 1, 0)
 
@@ -1717,7 +1722,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPMem_cut)),
 #### EcogSP Everyday Organization
 
 ```{r, echo=FALSE}
-cvalue$EcogSPOrgan <- mean(wide_dat$EcogSPOrgan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPOrgan_0, na.rm = TRUE)
+cvalue$EcogSPOrgan <- calculate_cvalue(EcogSPOrgan)
 
 long_dat$EcogSPOrgan_cut <- ifelse(long_dat$EcogSPOrgan > cvalue$EcogSPOrgan, 1, 0)
 
@@ -1770,7 +1775,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPOrgan_cut)),
 #### EcogSP Everyday Planning
 
 ```{r, echo=FALSE}
-cvalue$EcogSPPlan <- mean(wide_dat$EcogSPPlan_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPPlan_0, na.rm = TRUE)
+cvalue$EcogSPPlan <- calculate_cvalue(EcogSPPlan)
 
 long_dat$EcogSPPlan_cut <- ifelse(long_dat$EcogSPPlan > cvalue$EcogSPPlan, 1, 0)
 
@@ -1823,7 +1828,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPPlan_cut)),
 #### EcogSP Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$EcogSPVisspat <- mean(wide_dat$EcogSPVisspat_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPVisspat_0, na.rm = TRUE)
+cvalue$EcogSPVisspat <- calculate_cvalue(EcogSPVisspat)
 
 long_dat$EcogSPVisspat_cut <- ifelse(long_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
 
@@ -1876,7 +1881,7 @@ ggplot(long_dat %>% filter(!is.na(EcogSPVisspat_cut)),
 #### EcogSP Total ???
 
 ```{r, echo=FALSE}
-cvalue$EcogSPTotal <- mean(wide_dat$EcogSPTotal_0, na.rm=TRUE) + 2* sd(wide_dat$EcogSPTotal_0, na.rm = TRUE)
+cvalue$EcogSPTotal <- calculate_cvalue(EcogSPTotal)
 
 long_dat$EcogSPTotal_cut <- ifelse(long_dat$EcogSPTotal > cvalue$EcogSPTotal, 1, 0)
 
