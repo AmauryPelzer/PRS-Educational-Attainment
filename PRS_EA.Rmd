@@ -219,6 +219,9 @@ age_60to70_df <- long_dat %>% # Data frame filtered for age
 
 age_65to75_df <- long_dat %>% # Data frame filtered for age
   filter(AGE >= 65 & AGE <= 75)
+
+age_60to75_df <- long_dat %>% # Data frame filtered for age
+  filter(AGE >= 60 & AGE <= 75)
 ```
 
 # Attrition Analysis
@@ -401,68 +404,6 @@ ggplot() +
 ```
 
 It is interesting to see that the residual plot is not normally distributed. **Does this suggest that we should continue using non-parametric analysis techniques?**
-
-# Group PGS scores
-
-To investigate whether there is a difference for people that had an outstandingly high or low PGS it may be interesting to group the data based on standard deviation. To that end the polygenic risk scores were standardized and filtered for either 1 or 2 standard deviations away from the mean polygenic risk score.
-The distribution of the raw PGS's is depicted as well as the scaled PGS's. Lastly, a barplot shows the number of individuals that deviated either 1 or 2 standard deviations form the mean polygenic risk score. 
-
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
-
-long_dat <- long_dat %>% mutate(zPGS = scale(EA22, center = TRUE, scale = TRUE)) # Scale PGS and create new                                                                                     column
-
-# plot raw EA22 scores
-
-ggplot(long_dat %>% distinct(RID, .keep_all = TRUE), aes(x = EA22)) + 
-  geom_histogram(binwidth = 0.2, fill = "#bbceed", color = "black") +
-  labs(title = "Histogram of Raw Polygenic Risk Scores",
-       x = "EA22",
-       y = "Frequency") +
-  theme(axis.title = element_text(size = 12),
-        axis.text = element_text(size = 10),
-        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-        axis.line = element_line(size = 0.5))
-
-# plot scaled EA22 scores
-
-ggplot(long_dat %>% distinct(RID, .keep_all = TRUE), aes(x = zPGS)) +
-  geom_histogram(binwidth = 0.2, fill = "#bbceed", color = "black") +
-  labs(title = "Histogram of Scaled Raw Polygenic Risk Scores",
-       x = "EA22",
-       y = "Frequency") +
-  theme(axis.title = element_text(size = 12),
-        axis.text = element_text(size = 10),
-        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-        axis.line = element_line(size = 0.5))
-
-# filter for 1*SD 
-filtered_data1 <- long_dat %>%
-  filter(zPGS > 1 | zPGS < -1) # filter values 1SD
-
-# filter for 2*SD 
-filtered_data2 <- long_dat %>%
-  filter(zPGS > 2 | zPGS < -2) # filter values 2SD
-
-# count n of individuals in each df
-
-count_data <- data.frame(Filter = c("1 SD", "2 SD"),
-                         Count = c(nrow(filtered_data1 %>% distinct(RID)), 
-                                   nrow(filtered_data2 %>% distinct(RID))))
-
-# plot number in bar plot
-
-ggplot(count_data, aes(x = Filter, y = Count, fill = Filter)) +
-  geom_bar(stat = "identity", position = "dodge", color="black") +
-  labs(title = "Counts by Filter",
-       x = "Filter",
-       y = "Count") +
-  scale_fill_manual(values = c("1 SD" = "#bbceed", "2 SD" = "#021636")) +
-  theme(axis.title = element_text(size = 12),
-        axis.text = element_text(size = 10),
-        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-        axis.line = element_line(size = 0.5))
-
-```
 
 # Survival Analysis
 
