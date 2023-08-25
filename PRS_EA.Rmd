@@ -13,7 +13,7 @@ if (suppressWarnings(!require(survival))) {install.packages("survival"); library
 if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
 if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
 if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
-
+if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
 ```
 
 # Data Preprocessing
@@ -222,6 +222,29 @@ age_65to75_df <- long_dat %>% # Data frame filtered for age
 
 age_60to75_df <- long_dat %>% # Data frame filtered for age
   filter(AGE >= 60 & AGE <= 75)
+
+# AGE Groups (1,2,3 for 60-65, 66-70, 71-75)
+
+long_dat$Age_Group <- ifelse(
+  long_dat$AGE >= 60.0 & long_dat$AGE <= 65.0, 1,
+  ifelse(
+    long_dat$AGE >= 66.0 & long_dat$AGE <= 70.0, 2,
+    ifelse(
+      long_dat$AGE >= 71.0 & long_dat$AGE <= 75.0, 3,
+      NA_integer_
+    )
+  )
+)
+
+# Append to Wide data frame too 
+wide_dat <- wide_dat %>%
+  left_join(
+    long_dat %>% 
+      group_by(RID) %>%
+      filter(row_number() == 1) %>%  # Keep only the first row for each unique RID
+      select(RID, Age_Group),
+    by = "RID"
+  )
 ```
 
 # Attrition Analysis
@@ -418,8 +441,28 @@ long_dat$thirtile <- ntile(long_dat$res, 3)
 
 "The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19--23 points) cognitive impairment." (Wikipedia.org)
 
+
+```{r}
+# Boxplot for MMSE by Age Group
+ggplot(wide_dat, aes(x = factor(Age_Group), y = MMSE_0)) +
+  geom_boxplot() +
+  labs(x = "Age Group", y = "MMSE_0", title = "Boxplot of MMSE_0 by Age Group")
+```
+
+
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-long_dat$MMSE_cut <- ifelse(long_dat$MMSE < 24, 1, 0)
+# normalize MMSE
+cvalue <- list()
+long_dat$MMSE_norm <- normMMSE(long_dat$MMSE)
+
+cvalue$MMSE <- wide_dat %>%
+    filter(DX_0 == "CN") %>%
+    summarize(
+      value := mean(MMSE_0, na.rm = TRUE) - 2 * sd(MMSE_0, na.rm = TRUE)
+    ) %>%
+    pull(value)
+
+long_dat$MMSE_cut <- ifelse(long_dat$MMSE < cvalue$MMSE, 1, 0)
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- long_dat %>%
@@ -466,6 +509,9 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
   theme(axis.line = element_line(size = 0.5),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+
+res <- lm(MMSE ~ EA22 + Age_Group, data = subset(long_dat, !is.na(Age_Group)))
+summary(res)
 ```
 
 ## Alzheimer's Disease Assessment Scale
@@ -481,7 +527,6 @@ In addition, the score of the task 4 (Word Recognition, ADASQ4) was included in 
 ### ADAS11
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue <- list()
 
 calculate_cvalue <- function(variable) {
   var_bl <- paste0(deparse(substitute(variable)), "_0")
