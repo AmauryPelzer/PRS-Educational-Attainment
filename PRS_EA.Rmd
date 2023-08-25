@@ -14,6 +14,7 @@ if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); libra
 if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
 if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
 if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
+if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
 ```
 
 # Data Preprocessing
@@ -385,7 +386,6 @@ model <- lm(PTEDUCAT~EA22+AGE+PTGENDER,data=long_dat)
 check_model(model)
 ```
 
-
 ## Create Residuals
 
 To get the residual we regressed the polygenic risk score for educational attainment against actual EA including the variables SEX & AGE as covariates. The results are depicted in the density plot.
@@ -440,41 +440,12 @@ long_dat$thirtile_PGS <- ntile(long_dat$EA22, 3)
 
 ## Mini-Mental State Examination (MMSE)
 
-"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org)
+"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org). The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated.
 
-### Boxplots of MMSE by Age Group at Baseline
-
-To see if it is necessary to stratify for age groups the 
 ```{r, echo=FALSE}
-filtered_wide_dat <- wide_dat %>% #filter out NA cases (== AGE is not between 60-75)
-  filter(!is.na(Age_Group))
-
-# Boxplot for MMSE by Age Group
-ggplot(filtered_wide_dat, aes(x = factor(Age_Group), y = MMSE_0)) +
-  geom_boxplot(fill = c("#6d8fa6", "#8596a1","#bbceed"), color = "black") + # Set fill and border colours
-  scale_x_discrete(labels = c("60-65", "66-70", "71-75")) + # Set x axis scale labels
-  labs(x = "Age Group", y = "MMSE Score") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),  # Adjust title
-        axis.title = element_text(size = 12),  # Adjust axis title font size
-        axis.text = element_text(size = 10),   # Adjust axis text font size
-        panel.grid.major = element_blank(),     # Remove major grid lines
-        panel.grid.minor = element_blank()) +   # Remove minor grid lines
-  ggtitle("Boxplot of MMSE at baseline by Age Group")     # Custom title
-
-res <- lm(MMSE ~ EA22 + Age_Group, data = subset(long_dat, !is.na(Age_Group)))
-summary(res)
-
-rm(filtered_wide_dat,res)
-```
-
-### MMSE Survival Analysis
-The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated.
-
-```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.show="hold"}
 
 cvalue <- list() # initialize list of cut-off values
+logrank_test <- list() # initialize list of log-rank tests
 
 long_dat$MMSE_norm <- normMMSE(long_dat$MMSE) # normalize MMSE
 
@@ -489,7 +460,65 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE < cvalue$MMSE, 1, 0) # Group individua
 
 ```
 
-```{r}
+### Boxplots of MMSE by Age Group at Baseline
+
+To see if it is necessary to stratify for age groups effect of polygenic risk score for EA and age group was tested using linear regression. The results are displayed below.
+
+```{r, echo=FALSE}
+filtered_long_dat <- long_dat %>% #filter out NA cases (== AGE is not between 60-75)
+  filter(!is.na(Age_Group), VISCODE==0)
+
+# Boxplot for MMSE by Age Group
+box1 <- ggplot(filtered_long_dat, aes(x = factor(Age_Group), y = MMSE)) +
+  geom_boxplot(fill = c("#6d8fa6", "#8596a1","#bbceed"), color = "black") + # Set fill and border colours
+  scale_x_discrete(labels = c("60-65", "66-70", "71-75")) + # Set x axis scale labels
+  labs(x = "Age Group", y = "MMSE Score") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),  # Adjust title
+        axis.title = element_text(size = 12),  # Adjust axis title font size
+        axis.text = element_text(size = 10),   # Adjust axis text font size
+        panel.grid.major = element_blank(),     # Remove major grid lines
+        panel.grid.minor = element_blank()) +   # Remove minor grid lines
+  ggtitle("Boxplot of raw MMSE at baseline by Age Group") +
+  theme(plot.title = element_text(size = 9)) # Custom title     # Custom title
+
+
+# Boxplot for normMMSE by Age Group
+box2 <- ggplot(filtered_long_dat, aes(x = factor(Age_Group), y = MMSE_norm)) +
+  geom_boxplot(fill = c("#6d8fa6", "#8596a1","#bbceed"), color = "black") + # Set fill and border colours
+  scale_x_discrete(labels = c("60-65", "66-70", "71-75")) + # Set x axis scale labels
+  labs(x = "Age Group", y = "MMSE Score") +
+  theme_minimal() +
+  theme(axis.line = element_line(size = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),  # Adjust title
+        axis.title = element_text(size = 12),  # Adjust axis title font size
+        axis.text = element_text(size = 10),   # Adjust axis text font size
+        panel.grid.major = element_blank(),     # Remove major grid lines
+        panel.grid.minor = element_blank()) +   # Remove minor grid lines
+  ggtitle("Boxplot of norm MMSE at baseline by Age Group") +
+  theme(plot.title = element_text(size = 9)) # Custom title
+
+res <- lm(MMSE ~ EA22 + Age_Group, data = long_dat)
+res2 <- lm(MMSE_norm ~ EA22 + Age_Group, data = long_dat)
+
+grid.arrange(box1, box2, ncol = 2)
+summary(res)
+summary(res2)
+
+rm(filtered_long_dat, box1, box2, res, res2)
+```
+
+### MMSE Survival Analysis
+
+Next the survival analysis was conducted for the genetic capacity of educational attainment and the residual educational attainment.
+
+```{r, echo=FALSE}
+
+################################################################################
+# MMSE~Genetic Capacity
+################################################################################
+
 # Fit the Kaplan-Meier estimator (MMSE~PGS)
 
 surv_fit <- long_dat %>%
@@ -517,12 +546,13 @@ axis(1, lwd = 1)  # Change x-axis thickness
 axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test (MMSE~PGS)
-
-logrank_test <- list()
 logrank_test$MMSE_PGS <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_PGS != 1, AGE>=60, AGE<=75) %>%
+  filter(as.integer(VISCODE) <= 9, thirtile_PGS != 2, AGE>=60, AGE<=75) %>%
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-logrank_test$MMSE_PGS
+
+################################################################################
+# MMSE~Residual EA
+################################################################################
 
 # Fit the Kaplan-Meier estimator (MMSE~res)
 
@@ -549,76 +579,39 @@ legend("bottomleft",
 axis(1, lwd = 1)  # Change x-axis thickness
 axis(2, lwd = 1)  # Change y-axis thickness
 
-# Log Rank Test (MMSE~PGS)
-
-logrank_test <- list()
+# Log Rank Test (MMSE~res)
 
 logrank_test$MMSE_res <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_res != 1, AGE>=60, AGE<=75) %>%
+  filter(as.integer(VISCODE) <= 9, thirtile_res != 2, AGE>=60, AGE<=75) %>%
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
-
-logrank_test$MMSE_res
 ```
 
-```{r}
+The difference between the high and low capacity/residual Educational attainment are `r logrank_test$MMSE_PGS$pvalue` and `r logrank_test$MMSE_res$pvalue` respectively. In the next step the surivival analysis was conducted stratified for genetic capacity for educational attainment.
+
+```{r, echo=FALSE}
+
+par(mfrow=c(1,3)) # Set parameters for plots
+
+################################################################################
+# MMSE~Residual EA by Genetic Capacity (Low)
+################################################################################
 
 # Fit the Kaplan-Meier estimator
+
 surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==1) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
 
 # Create the Kaplan-Meier survival plot
+
 plot(surv_fit, 
      main = "Kaplan-Meier Survival Curve (Low PGS)", 
      xlab = "Time", 
      ylab = "Survival Probability", 
      col = c("#021636", "#bbceed", "#0a77f5"), 
      lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==2) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (Middle PGS)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==3) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (High PGS)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
+     xlim = c(0, 10),
+     cex.main = 0.95) 
 
 legend("bottomleft", 
        legend = c("Underachiever", "Average", "Overachiever"), 
@@ -629,13 +622,93 @@ axis(1, lwd = 1)  # Change x-axis thickness
 axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test 
-logrank_test <- list()
-logrank_test$MMSE <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
-logrank_test$MMSE
 
-# Histogram depicting the number of people measured at each time point by group by outcome
+logrank_test$MMSE_res_low <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, 
+         thirtile_res != 2, 
+         thirtile_PGS==1) %>% # Low PGS
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+
+################################################################################
+# MMSE~Residual EA by Genetic Capacity (Middle)
+################################################################################
+
+# Fit the Kaplan-Meier estimator
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==2) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+
+# Create the Kaplan-Meier survival plot
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (Middle PGS)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+
+logrank_test$MMSE_res_mid <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, 
+         thirtile_res != 2, 
+         thirtile_PGS==2) %>% # Middle PGS
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+
+################################################################################
+# MMSE~Residual EA by Genetic Capacity (High)
+################################################################################
+
+# Fit the Kaplan-Meier estimator
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==3) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+
+# Create the Kaplan-Meier survival plot
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (High PGS)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95) 
+
+legend("bottomleft", 
+       legend = c("Underachiever", "Average", "Overachiever"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test
+
+logrank_test$MMSE_res_high <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, 
+         thirtile_res != 2, 
+         thirtile_PGS==3) %>% # High PGS
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+```
+
+```{r, include=FALSE}
+################################################################################
+# Histogram # people by time point by group by outcome
+################################################################################
+
 ggplot(long_dat %>% filter(!is.na(MMSE_cut)), 
        aes(x = as.integer(VISCODE), fill = factor(MMSE_cut))) +
   geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
@@ -652,6 +725,10 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
+
+Log Test Low: `r logrank_test$MMSE_res_low$pvalue`<br>
+Log Test Middle: `r logrank_test$MMSE_res_mid$pvalue`<br>
+Log Test High:`r logrank_test$MMSE_res_high$pvalue`
 
 ## Alzheimer's Disease Assessment Scale
 
@@ -957,8 +1034,7 @@ ggplot(long_dat %>% filter(!is.na(DIGITSCOR_cut)),
 
 ## FAQ
 
-The Functional Activities Questionnaire is used to assess an individual's functional abilities in daily living activities. It is a caregiver-based questionnaire that helps evaluate how well a person is able to perform various instrumental activities of daily living (IADLs) and basic activities of daily living (ADLs). (ChatGPT)
-Sum scores (range 0-30). The score range for each item is 0–3 (higher scores indicate greater impairment; 0 = normal or never did but could do now; 1 = has difficulty but does by self or never did but would have difficulty now; 2 = requires assistance; 3 = dependent). There is no established cut-off score for IADL impairment on the FAQ. However, one study reported that a total FAQ score (sum of all 10 item scores; range 0–30) of ≥ 6 is suggestive of functional impairment [ [20](https://pubmed.ncbi.nlm.nih.gov/15592138/)]. ([Marshall et al., 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4448081/))
+The Functional Activities Questionnaire is used to assess an individual's functional abilities in daily living activities. It is a caregiver-based questionnaire that helps evaluate how well a person is able to perform various instrumental activities of daily living (IADLs) and basic activities of daily living (ADLs). (ChatGPT) Sum scores (range 0-30). The score range for each item is 0--3 (higher scores indicate greater impairment; 0 = normal or never did but could do now; 1 = has difficulty but does by self or never did but would have difficulty now; 2 = requires assistance; 3 = dependent). There is no established cut-off score for IADL impairment on the FAQ. However, one study reported that a total FAQ score (sum of all 10 item scores; range 0--30) of ≥ 6 is suggestive of functional impairment [ [20](https://pubmed.ncbi.nlm.nih.gov/15592138/)]. ([Marshall et al., 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4448081/))
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$FAQ <- 5
@@ -1128,7 +1204,6 @@ The RAVLT was included as a measure of memory function. In this test, the partic
 
 Different summary scores are derived from raw RAVLT scores. These include RAVLT Immediate (the sum of scores from 5 first trials (Trials 1 to 5)), RAVLT Learning (the score of Trial 5 minus the score of Trial 1), RAVLT Forgetting (the score of Trial 5 minus score of the delayed recall) and RAVLT Percent Forgetting (RAVLT Forgetting divided by the score of Trial 5). We use naming of the ADNI merge table3 for these summary measures. We investigated the relationship between MRI measures and RAVLT cognitive test scores by estimating the RAVLT Immediate and RAVLT Percent Forgetting from the gray matter density. These two summary scores were selected since they highlight different aspects of episodic memory, learning (RAVLT Immediate) and delayed memory (RAVLT Percent forgetting), essential to AD and previous studies (Estévez-González et al., 2003, Wang et al., 2011, Gomar et al., 2014, Moradi et al., 2015) have indicated strong relationships between these two RAVLT measures and Alzheimer's disease.
 
-
 ### RAVLT Immediate
 
 ```{r, echo=FALSE, message=FALSE}
@@ -1186,7 +1261,6 @@ ggplot(long_dat %>% filter(!is.na(RAVLT_immediate_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
-
 
 ### RAVLT Percentage Forgetting
 
@@ -1406,7 +1480,6 @@ ggplot(long_dat %>% filter(!is.na(TRABSCOR_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
-
 
 ## Patient's Everyday Cognition (EcogPt)
 
@@ -1730,7 +1803,6 @@ ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-
 ### EcogPt Total ???
 
 ```{r, echo=FALSE}
@@ -1783,7 +1855,6 @@ ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
-
 
 ## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
 
@@ -2164,4 +2235,3 @@ test <- long_dat %>% filter(AGE %in% 60:70)
 # also test # people 65 to 75
 
 ```
-
