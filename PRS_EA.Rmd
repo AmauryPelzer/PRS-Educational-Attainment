@@ -426,11 +426,9 @@ ggplot() +
   theme_minimal()
 ```
 
-It is interesting to see that the residual plot is not normally distributed. **Does this suggest that we should continue using non-parametric analysis techniques?**
-
 # Survival Analysis
 
-Using the ntile function from dplyr, the lower tertile will be assigned value 1 (\~ negative residual), middle tertile value 2 and upper tertile value 3 (\~positive residual).
+Using the ntile function from dplyr, the lower tertile will be assigned value 1 (\~ negative residual), middle tertile value 2 and upper tertile value 3 (\~positive residual). The time-point is limited to the 9th follow-up (i.e., 48 months)
 
 ```{r, echo=FALSE}
 # Divide the standardized residuals into upper, middle and lower quartile
@@ -442,11 +440,13 @@ long_dat$thirtile_PGS <- ntile(long_dat$EA22, 3)
 
 ## Mini-Mental State Examination (MMSE)
 
-"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19--23 points) cognitive impairment." (Wikipedia.org)
+"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org)
 
+### Boxplots of MMSE by Age Group at Baseline
 
-```{r}
-filtered_wide_dat <- wide_dat %>% 
+To see if it is necessary to stratify for age groups the 
+```{r, echo=FALSE}
+filtered_wide_dat <- wide_dat %>% #filter out NA cases (== AGE is not between 60-75)
   filter(!is.na(Age_Group))
 
 # Boxplot for MMSE by Age Group
@@ -463,37 +463,50 @@ ggplot(filtered_wide_dat, aes(x = factor(Age_Group), y = MMSE_0)) +
         panel.grid.minor = element_blank()) +   # Remove minor grid lines
   ggtitle("Boxplot of MMSE at baseline by Age Group")     # Custom title
 
+res <- lm(MMSE ~ EA22 + Age_Group, data = subset(long_dat, !is.na(Age_Group)))
+summary(res)
+
+rm(filtered_wide_dat,res)
 ```
 
+### MMSE Survival Analysis
+The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.show="hold"}
-# normalize MMSE
-cvalue <- list()
 
-long_dat$MMSE_norm <- normMMSE(long_dat$MMSE)
+cvalue <- list() # initialize list of cut-off values
 
-cvalue$MMSE <- wide_dat %>%
+long_dat$MMSE_norm <- normMMSE(long_dat$MMSE) # normalize MMSE
+
+cvalue$MMSE <- wide_dat %>% # Calculate cut-off value for normalized MMSE
     filter(DX_0 == "CN") %>%
     summarize(
       value := mean(MMSE_0, na.rm = TRUE) - 2 * sd(MMSE_0, na.rm = TRUE)
     ) %>%
     pull(value)
 
-long_dat$MMSE_cut <- ifelse(long_dat$MMSE < cvalue$MMSE, 1, 0)
+long_dat$MMSE_cut <- ifelse(long_dat$MMSE < cvalue$MMSE, 1, 0) # Group individuals by cut-off value
 
-# Fit the Kaplan-Meier estimator
+```
+
+```{r}
+# Fit the Kaplan-Meier estimator (MMSE~PGS)
+
 surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
 
-# Create the Kaplan-Meier survival plot
+# Create the Kaplan-Meier survival plot (MMSE~PGS)
+par(mfrow=c(1,2))
+
 plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
+     main = "Kaplan-Meier Survival Curve (MMSE~PGS)", 
      xlab = "Time", 
      ylab = "Survival Probability", 
      col = c("#021636", "#bbceed", "#0a77f5"), 
      lwd = 2,
-     xlim = c(0, 10)) 
+     xlim = c(0, 10),
+     cex.main = 0.95) 
 
 legend("bottomleft", 
        legend = c("Low capacity", "Average", "High capacity"), 
@@ -503,12 +516,51 @@ legend("bottomleft",
 axis(1, lwd = 1)  # Change x-axis thickness
 axis(2, lwd = 1)  # Change y-axis thickness
 
-# Log Rank Test 
+# Log Rank Test (MMSE~PGS)
+
 logrank_test <- list()
-logrank_test$MMSE <- long_dat %>%
+logrank_test$MMSE_PGS <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, thirtile_PGS != 1, AGE>=60, AGE<=75) %>%
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-logrank_test$MMSE
+logrank_test$MMSE_PGS
+
+# Fit the Kaplan-Meier estimator (MMSE~res)
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+
+# Create the Kaplan-Meier survival plot (MMSE~res)
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (MMSE~res)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95)  # Adjust the size of the title 
+
+legend("bottomleft", 
+       legend = c("Underperformed", "Average", "Overperformed"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test (MMSE~PGS)
+
+logrank_test <- list()
+
+logrank_test$MMSE_res <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, thirtile_res != 1, AGE>=60, AGE<=75) %>%
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+
+logrank_test$MMSE_res
+```
+
+```{r}
 
 # Fit the Kaplan-Meier estimator
 surv_fit <- long_dat %>%
@@ -599,9 +651,6 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
   theme(axis.line = element_line(size = 0.5),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-
-res <- lm(MMSE ~ EA22 + Age_Group, data = subset(long_dat, !is.na(Age_Group)))
-summary(res)
 ```
 
 ## Alzheimer's Disease Assessment Scale
