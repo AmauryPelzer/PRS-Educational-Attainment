@@ -1,7 +1,7 @@
 ---
 title: "PGS Educational Attainment"
-output: html_document
 author: Sebastian Marten & Amaury Pelzer
+output: rmdformats::robobook
 ---
 
 ```{r, include=FALSE}
@@ -15,6 +15,7 @@ if (suppressWarnings(!require(performance))) {install.packages("performance"); l
 if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
 if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
 if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
+if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
 ```
 
 # Data Preprocessing
@@ -449,14 +450,14 @@ logrank_test <- list() # initialize list of log-rank tests
 
 long_dat$MMSE_norm <- normMMSE(long_dat$MMSE) # normalize MMSE
 
-cvalue$MMSE <- wide_dat %>% # Calculate cut-off value for normalized MMSE
+cvalue$MMSE_norm <- wide_dat %>% # Calculate cut-off value for normalized MMSE
     filter(DX_0 == "CN") %>%
     summarize(
-      value := mean(MMSE_0, na.rm = TRUE) - 2 * sd(MMSE_0, na.rm = TRUE)
+      value := mean(normMMSE(MMSE_0), na.rm = TRUE) - 2 * sd(normMMSE(MMSE_0), na.rm = TRUE)
     ) %>%
     pull(value)
 
-long_dat$MMSE_cut <- ifelse(long_dat$MMSE < cvalue$MMSE, 1, 0) # Group individuals by cut-off value
+long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group individuals by cut-off value
 
 ```
 
