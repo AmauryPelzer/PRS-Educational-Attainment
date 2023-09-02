@@ -705,6 +705,7 @@ logrank_test$MMSE_res_high <- long_dat %>%
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
 ```
 
+
 ```{r, include=FALSE}
 ################################################################################
 # Histogram # people by time point by group by outcome
@@ -730,6 +731,126 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
 Log Test Low: `r logrank_test$MMSE_res_low$pvalue`<br>
 Log Test Middle: `r logrank_test$MMSE_res_mid$pvalue`<br>
 Log Test High:`r logrank_test$MMSE_res_high$pvalue`
+
+```{r, echo=FALSE, fig.width = 12}
+
+par(mfrow=c(1,3)) # Set parameters for plots
+
+################################################################################
+# MMSE~ by Genetic Capacity by Residual EA (Underachiever)
+################################################################################
+
+# Fit the Kaplan-Meier estimator
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_res==1) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+
+# Create the Kaplan-Meier survival plot
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (Underachiever)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95) 
+
+legend("bottomleft", 
+       legend = c("Low PGS", "Middle PGS", "High PGS"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+
+logrank_test$MMSE_PGS_low <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, 
+         thirtile_PGS != 2, 
+         thirtile_res==1) %>% # Low PGS
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+
+################################################################################
+# MMSE~ by Genetic Capacity by Residual EA (Average Performance)
+################################################################################
+
+# Fit the Kaplan-Meier estimator
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_res==2) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+
+# Create the Kaplan-Meier survival plot
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (Average Performance)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95) 
+
+legend("bottomleft", 
+       legend = c("Low PGS", "Middle PGS", "High PGS"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test 
+
+logrank_test$MMSE_PGS_mid <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, 
+         thirtile_PGS != 2, 
+         thirtile_res==2) %>% # Middle PGS
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+
+################################################################################
+# MMSE~ by Genetic Capacity by Residual EA (Overachiever)
+################################################################################
+
+# Fit the Kaplan-Meier estimator
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_res==3) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+
+# Create the Kaplan-Meier survival plot
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (Overachiever)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95) 
+
+legend("bottomleft", 
+       legend = c("Low PGS", "Middle PGS", "High PGS"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test
+
+logrank_test$MMSE_PGS_high <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, 
+         thirtile_PGS != 2, 
+         thirtile_res==3) %>% # High PGS
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+```
+
+Log Test Underachiever: `r logrank_test$MMSE_PGS_low$pvalue`<br>
+Log Test Average Performance: `r logrank_test$MMSE_PGS_mid$pvalue`<br>
+Log Test Overachiever:`r logrank_test$MMSE_PGS_high$pvalue`
 
 ## Alzheimer's Disease Assessment Scale
 
