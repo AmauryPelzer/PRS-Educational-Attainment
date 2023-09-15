@@ -422,7 +422,7 @@ It is important to correctly interpret the residual scores. The correct way to i
 residuals <- results$residuals # get residuals
 predicted_scores <- predict(results) # get predicted scores for each individual
 
-combined_df <- data.frame(Actual = long_dat$PTEDUCAT, Predicted = as.numeric(predicted_scores), Residuals = as.numeric(residuals)) # Combine residuals, predicted scores, and actual scores into one data frame
+combined_df <- data.frame(Actual = wide_dat$PTEDUCAT, Predicted = as.numeric(predicted_scores), Residuals = as.numeric(residuals)) # Combine residuals, predicted scores, and actual scores into one data frame
 
 head(combined_df %>% filter(!duplicated(Actual))) # present data frame as example
 ```
@@ -444,8 +444,19 @@ Using the ntile function from dplyr, the lower tertile will be assigned value 1 
 # Divide the standardized residuals into upper, middle and lower quartile
 wide_dat$thirtile_res <- ntile(wide_dat$res, 3)
 
+boxplot(wide_dat$res~wide_dat$thirtile_res)
+hist(wide_dat$PTEDUCAT)
+
+# Divide the standardized residuals into upper, middle and lower quartile
+wide_dat$thirtile_years <- ntile(wide_dat$PTEDUCAT, 3)
+
 # Divide the PGS score for educational attainment into upper, middle and lower quartile
 wide_dat$thirtile_PGS <- ntile(wide_dat$EA22, 3)
+
+wide_dat_sub <- wide_dat[, c("RID", "thirtile_res", "res", "thirtile_years", "thirtile_PGS")]
+
+# Merge Thirtiles and residuals in long data format based on RID
+long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 ```
 
 ## Mini-Mental State Examination (MMSE)
@@ -457,7 +468,7 @@ wide_dat$thirtile_PGS <- ntile(wide_dat$EA22, 3)
 cvalue <- list() # initialize list of cut-off values
 logrank_test <- list() # initialize list of log-rank tests
 
-wide_dat$MMSE_norm <- normMMSE(wide_dat$MMSE) # normalize MMSE
+long_dat$MMSE_norm <- normMMSE(long_dat$MMSE) # normalize MMSE
 
 cvalue$MMSE_norm <- wide_dat %>% # Calculate cut-off value for normalized MMSE
     filter(DX_0 == "CN") %>%
@@ -466,8 +477,24 @@ cvalue$MMSE_norm <- wide_dat %>% # Calculate cut-off value for normalized MMSE
     ) %>%
     pull(value)
 
-wide_dat$MMSE_cut <- ifelse(wide_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group individuals by cut-off value
+long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group individuals by cut-off value
 
+```
+
+
+```{r}
+library(nlme)
+long_dat$RID <- as.character(long_dat$RID)
+long_dat$VISCODE <- as.numeric(long_dat$VISCODE)
+long_dat$thirtile_PGS <- as.character(long_dat$thirtile_PGS)
+long_dat$thirtile_res <- as.character(long_dat$thirtile_res)
+long_dat$thirtile_years <- as.character(long_dat$thirtile_years)
+model1 <- lme(MMSE_norm~EA22*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+model2 <- lme(MMSE_norm~PTEDUCAT*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+model3 <- lme(MMSE_norm~res*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+model4 <- lme(MMSE_norm~thirtile_PGS*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+model5 <- lme(MMSE_norm~thirtile_years*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+model6 <- lme(MMSE_norm~thirtile_res*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
 ```
 
 ### Boxplots of MMSE by Age Group at Baseline
@@ -475,11 +502,11 @@ wide_dat$MMSE_cut <- ifelse(wide_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group
 To see if it is necessary to stratify for age groups effect of polygenic risk score for EA and age group was tested using linear regression. The results are displayed below.
 
 ```{r, echo=FALSE}
-filtered_wide_dat <- wide_dat %>% #filter out NA cases (== AGE is not between 60-75)
+filtered_long_dat <- long_dat %>% #filter out NA cases (== AGE is not between 60-75)
   filter(!is.na(Age_Group), VISCODE==0)
 
 # Boxplot for MMSE by Age Group
-box1 <- ggplot(filtered_wide_dat, aes(x = factor(Age_Group), y = MMSE)) +
+box1 <- ggplot(filtered_long_dat, aes(x = factor(Age_Group), y = MMSE)) +
   geom_boxplot(fill = c("#6d8fa6", "#8596a1","#bbceed"), color = "black") + # Set fill and border colours
   scale_x_discrete(labels = c("60-65", "66-70", "71-75")) + # Set x axis scale labels
   labs(x = "Age Group", y = "MMSE Score") +
@@ -495,7 +522,7 @@ box1 <- ggplot(filtered_wide_dat, aes(x = factor(Age_Group), y = MMSE)) +
 
 
 # Boxplot for normMMSE by Age Group
-box2 <- ggplot(filtered_wide_dat, aes(x = factor(Age_Group), y = MMSE_norm)) +
+box2 <- ggplot(filtered_long_dat, aes(x = factor(Age_Group), y = MMSE_norm)) +
   geom_boxplot(fill = c("#6d8fa6", "#8596a1","#bbceed"), color = "black") + # Set fill and border colours
   scale_x_discrete(labels = c("60-65", "66-70", "71-75")) + # Set x axis scale labels
   labs(x = "Age Group", y = "MMSE Score") +
@@ -509,14 +536,14 @@ box2 <- ggplot(filtered_wide_dat, aes(x = factor(Age_Group), y = MMSE_norm)) +
   ggtitle("Boxplot of norm MMSE at baseline by Age Group") +
   theme(plot.title = element_text(size = 9)) # Custom title
 
-res <- lm(MMSE ~ EA22 + Age_Group, data = wide_dat)
-res2 <- lm(MMSE_norm ~ EA22 + Age_Group, data = wide_dat)
+res <- lm(MMSE ~ EA22 + Age_Group, data = long_dat)
+res2 <- lm(MMSE_norm ~ EA22 + Age_Group, data = long_dat)
 
 grid.arrange(box1, box2, ncol = 2)
 summary(res)
 summary(res2)
 
-rm(filtered_wide_dat, box1, box2, res, res2)
+rm(filtered_long_dat, box1, box2, res, res2)
 ```
 
 ### MMSE Survival Analysis
@@ -524,6 +551,41 @@ rm(filtered_wide_dat, box1, box2, res, res2)
 Next the survival analysis was conducted for the genetic capacity of educational attainment and the residual educational attainment.
 
 ```{r, echo=FALSE, fig.width = 10}
+################################################################################
+# MMSE~Genetic Capacity
+################################################################################
+
+# Fit the Kaplan-Meier estimator (MMSE~PGS)
+
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
+
+# Create the Kaplan-Meier survival plot (MMSE~PGS)
+par(mfrow=c(1,3))
+
+plot(surv_fit, 
+     main = "Kaplan-Meier Survival Curve (MMSE~years)", 
+     xlab = "Time", 
+     ylab = "Survival Probability", 
+     col = c("#021636", "#bbceed", "#0a77f5"), 
+     lwd = 2,
+     xlim = c(0, 10),
+     cex.main = 0.95) 
+
+legend("bottomleft", 
+       legend = c("Low capacity", "Average", "High capacity"), 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2)
+
+axis(1, lwd = 1)  # Change x-axis thickness
+axis(2, lwd = 1)  # Change y-axis thickness
+
+# Log Rank Test (MMSE~PGS)
+logrank_test$MMSE_years <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, thirtile_years != 2, AGE>=60, AGE<=75) %>%
+  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
+
 
 ################################################################################
 # MMSE~Genetic Capacity
@@ -531,12 +593,10 @@ Next the survival analysis was conducted for the genetic capacity of educational
 
 # Fit the Kaplan-Meier estimator (MMSE~PGS)
 
-surv_fit <- wide_dat %>%
+surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
 
-# Create the Kaplan-Meier survival plot (MMSE~PGS)
-par(mfrow=c(1,2))
 
 plot(surv_fit, 
      main = "Kaplan-Meier Survival Curve (MMSE~PGS)", 
@@ -556,7 +616,7 @@ axis(1, lwd = 1)  # Change x-axis thickness
 axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test (MMSE~PGS)
-logrank_test$MMSE_PGS <- wide_dat %>%
+logrank_test$MMSE_PGS <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, thirtile_PGS != 2, AGE>=60, AGE<=75) %>%
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
 
@@ -566,7 +626,7 @@ logrank_test$MMSE_PGS <- wide_dat %>%
 
 # Fit the Kaplan-Meier estimator (MMSE~res)
 
-surv_fit <- wide_dat %>%
+surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
 
@@ -591,7 +651,7 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test (MMSE~res)
 
-logrank_test$MMSE_res <- wide_dat %>%
+logrank_test$MMSE_res <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, thirtile_res != 2, AGE>=60, AGE<=75) %>%
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
 ```
@@ -608,9 +668,9 @@ par(mfrow=c(1,3)) # Set parameters for plots
 
 # Fit the Kaplan-Meier estimator
 
-surv_fit <- wide_dat %>%
+surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==1) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot
 
@@ -633,7 +693,7 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test 
 
-logrank_test$MMSE_res_low <- wide_dat %>%
+logrank_test$MMSE_res_low <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, 
          thirtile_res != 2, 
          thirtile_PGS==1) %>% # Low PGS
@@ -645,9 +705,9 @@ logrank_test$MMSE_res_low <- wide_dat %>%
 
 # Fit the Kaplan-Meier estimator
 
-surv_fit <- wide_dat %>%
+surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==2) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot
 
@@ -670,9 +730,9 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test 
 
-logrank_test$MMSE_res_mid <- wide_dat %>%
+logrank_test$MMSE_res_mid <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, 
-         thirtile_res != 2, 
+         thirtile_res != 1, 
          thirtile_PGS==2) %>% # Middle PGS
   survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
 
@@ -682,9 +742,9 @@ logrank_test$MMSE_res_mid <- wide_dat %>%
 
 # Fit the Kaplan-Meier estimator
 
-surv_fit <- wide_dat %>%
+surv_fit <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==3) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot
 
@@ -707,7 +767,7 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test
 
-logrank_test$MMSE_res_high <- wide_dat %>%
+logrank_test$MMSE_res_high <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, 
          thirtile_res != 2, 
          thirtile_PGS==3) %>% # High PGS
@@ -720,7 +780,7 @@ logrank_test$MMSE_res_high <- wide_dat %>%
 # Histogram # people by time point by group by outcome
 ################################################################################
 
-ggplot(wide_dat %>% filter(!is.na(MMSE_cut)), 
+ggplot(long_dat %>% filter(!is.na(MMSE_cut)), 
        aes(x = as.integer(VISCODE), fill = factor(MMSE_cut))) +
   geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
   scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
@@ -751,8 +811,8 @@ par(mfrow=c(1,3)) # Set parameters for plots
 
 # Fit the Kaplan-Meier estimator
 
-surv_fit <- wide_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_res==1) %>%
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_years==1) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
 
 # Create the Kaplan-Meier survival plot
@@ -776,7 +836,7 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test 
 
-logrank_test$MMSE_PGS_low <- wide_dat %>%
+logrank_test$MMSE_PGS_low <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, 
          thirtile_PGS != 2, 
          thirtile_res==1) %>% # Low PGS
@@ -788,8 +848,8 @@ logrank_test$MMSE_PGS_low <- wide_dat %>%
 
 # Fit the Kaplan-Meier estimator
 
-surv_fit <- wide_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_res==2) %>%
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_years==2) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
 
 # Create the Kaplan-Meier survival plot
@@ -813,7 +873,7 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test 
 
-logrank_test$MMSE_PGS_mid <- wide_dat %>%
+logrank_test$MMSE_PGS_mid <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, 
          thirtile_PGS != 2, 
          thirtile_res==2) %>% # Middle PGS
@@ -825,8 +885,8 @@ logrank_test$MMSE_PGS_mid <- wide_dat %>%
 
 # Fit the Kaplan-Meier estimator
 
-surv_fit <- wide_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_res==3) %>%
+surv_fit <- long_dat %>%
+  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_years==3) %>%
   survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
 
 # Create the Kaplan-Meier survival plot
@@ -850,7 +910,7 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test
 
-logrank_test$MMSE_PGS_high <- wide_dat %>%
+logrank_test$MMSE_PGS_high <- long_dat %>%
   filter(as.integer(VISCODE) <= 9, 
          thirtile_PGS != 2, 
          thirtile_res==3) %>% # High PGS
