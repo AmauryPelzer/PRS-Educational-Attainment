@@ -16,6 +16,8 @@ if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(c
 if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
 if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
 if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
+if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
+
 ```
 
 # Data Preprocessing
@@ -118,7 +120,7 @@ long_dat <- long_dat %>%
   mutate(
     RID = as.factor(RID),
     PTID = as.character(PTID),
-    VISCODE = as.factor(VISCODE),
+    VISCODE = as.numeric(VISCODE),
     AGE = as.numeric(AGE),
     PTGENDER = as.factor(PTGENDER),
     PTEDUCAT = as.integer(PTEDUCAT),
@@ -379,11 +381,11 @@ cor.test(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
 
 ## Check linear regression assumptions
 
-```{r}
-x <- lm(PTEDUCAT~PTGENDER, data=wide_dat)
+```{r, echo=FALSE}
+lm(PTEDUCAT~PTGENDER, data=wide_dat)
 boxplot(PTEDUCAT~PTGENDER, data=wide_dat)
 
-y <- lm(EA22~PTGENDER, data=wide_dat)
+lm(EA22~PTGENDER, data=wide_dat)
 boxplot(EA22~PTGENDER, data=wide_dat)
 
 # compare n gender
@@ -438,14 +440,21 @@ ggplot() +
 
 # Survival Analysis
 
-Using the ntile function from dplyr, the lower tertile will be assigned value 1 (\~ negative residual), middle tertile value 2 and upper tertile value 3 (\~positive residual). The time-point is limited to the 9th follow-up (i.e., 48 months)
+Using the ntile function from dplyr, the lower tertile will be assigned value 1 (\~ negative residual), middle tertile value 2 and upper tertile value 3 (\~positive residual). The time-point is limited to the 9th follow-up (i.e., 48 months).
 
 ```{r, echo=FALSE}
 # Divide the standardized residuals into upper, middle and lower quartile
 wide_dat$thirtile_res <- ntile(wide_dat$res, 3)
 
-boxplot(wide_dat$res~wide_dat$thirtile_res)
-hist(wide_dat$PTEDUCAT)
+boxplot(wide_dat$res ~ wide_dat$thirtile_res,
+        xlab = "Thirtile of Residual Scores",
+        ylab = "Residuals",
+        main = "Check overlap between Thirtiles")
+
+hist(wide_dat$PTEDUCAT, 
+     xlab = "Education in Years",
+     ylab = "Frequency",
+     main = "Histogram of Education Distribution")
 
 # Divide the standardized residuals into upper, middle and lower quartile
 wide_dat$thirtile_years <- ntile(wide_dat$PTEDUCAT, 3)
@@ -455,7 +464,7 @@ wide_dat$thirtile_PGS <- ntile(wide_dat$EA22, 3)
 
 wide_dat_sub <- wide_dat[, c("RID", "thirtile_res", "res", "thirtile_years", "thirtile_PGS")]
 
-# Merge Thirtiles and residuals in long data format based on RID
+# Merge Thirtile and residuals in long data format based on RID
 long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 ```
 
@@ -482,19 +491,37 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group
 ```
 
 
-```{r}
-library(nlme)
+```{r, echo=FALSE}
+
 long_dat$RID <- as.character(long_dat$RID)
 long_dat$VISCODE <- as.numeric(long_dat$VISCODE)
 long_dat$thirtile_PGS <- as.character(long_dat$thirtile_PGS)
 long_dat$thirtile_res <- as.character(long_dat$thirtile_res)
 long_dat$thirtile_years <- as.character(long_dat$thirtile_years)
+
+# Mixed Model predicting MMSE score based on PGS EA
 model1 <- lme(MMSE_norm~EA22*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+summary(model1)
+
+# Mixed Model predicting MMSE score based on Actual EA
 model2 <- lme(MMSE_norm~PTEDUCAT*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+summary(model2)
+
+# Mixed Model predicting MMSE score based on residual EA scores
 model3 <- lme(MMSE_norm~res*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+summary(model3)
+
+# Mixed Model predicting MMSE score based on thirtiles of PGS EA
 model4 <- lme(MMSE_norm~thirtile_PGS*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+summary(model4)
+
+# Mixed Model predicting MMSE score based on thirtiles of Years
 model5 <- lme(MMSE_norm~thirtile_years*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+summary(model5)
+
+# Mixed Model predicting MMSE score based on Thirtile Residuals
 model6 <- lme(MMSE_norm~thirtile_res*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
+summary(model6)
 ```
 
 ### Boxplots of MMSE by Age Group at Baseline
@@ -552,14 +579,14 @@ Next the survival analysis was conducted for the genetic capacity of educational
 
 ```{r, echo=FALSE, fig.width = 10}
 ################################################################################
-# MMSE~Genetic Capacity
+# MMSE~Thirtle of Actual EA
 ################################################################################
 
 # Fit the Kaplan-Meier estimator (MMSE~PGS)
 
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
+  filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
+  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot (MMSE~PGS)
 par(mfrow=c(1,3))
@@ -574,7 +601,7 @@ plot(surv_fit,
      cex.main = 0.95) 
 
 legend("bottomleft", 
-       legend = c("Low capacity", "Average", "High capacity"), 
+       legend = c("Low Performance", "Average Performance", "High Performance"), 
        col = c("#021636", "#bbceed", "#0a77f5"), 
        lwd = 2)
 
@@ -583,19 +610,18 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test (MMSE~PGS)
 logrank_test$MMSE_years <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_years != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
-
+  filter(VISCODE <= 9, thirtile_years != 2, AGE>=60, AGE<=75) %>%
+  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 ################################################################################
-# MMSE~Genetic Capacity
+# MMSE~Thirtile of PGS EA
 ################################################################################
 
 # Fit the Kaplan-Meier estimator (MMSE~PGS)
 
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+  filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
+  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_PGS, data = .)
 
 
 plot(surv_fit, 
@@ -617,8 +643,8 @@ axis(2, lwd = 1)  # Change y-axis thickness
 
 # Log Rank Test (MMSE~PGS)
 logrank_test$MMSE_PGS <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_PGS != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+  filter(VISCODE <= 9, thirtile_PGS != 2, AGE>=60, AGE<=75) %>%
+  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_PGS, data = .)
 
 ################################################################################
 # MMSE~Residual EA
@@ -627,8 +653,8 @@ logrank_test$MMSE_PGS <- long_dat %>%
 # Fit the Kaplan-Meier estimator (MMSE~res)
 
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
+  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_res, data = .)
 
 # Create the Kaplan-Meier survival plot (MMSE~res)
 
@@ -652,30 +678,32 @@ axis(2, lwd = 1)  # Change y-axis thickness
 # Log Rank Test (MMSE~res)
 
 logrank_test$MMSE_res <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_res != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
-```
+  filter(VISCODE <= 9, thirtile_res != 2, AGE>=60, AGE<=75) %>%
+  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_res, data = .)
 
-The difference between the high and low capacity/residual Educational attainment are `r logrank_test$MMSE_PGS$pvalue` and `r logrank_test$MMSE_res$pvalue` respectively. In the next step the survival analysis was conducted stratified for genetic capacity for educational attainment.
+logrank_test$MMSE_years$pvalue
+logrank_test$MMSE_PGS$pvalue
+logrank_test$MMSE_res$pvalue
+```
 
 ```{r, echo=FALSE, fig.width = 12}
 
 par(mfrow=c(1,3)) # Set parameters for plots
 
 ################################################################################
-# MMSE~Residual EA by Genetic Capacity (Low)
+# MMSE~Thirtile Years for only low capacity individuals
 ################################################################################
 
 # Fit the Kaplan-Meier estimator
 
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==1) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
+  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS==1) %>%
+  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot
 
 plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (Low PGS)", 
+     main = "Low EA capacity by Actual Years of Education", 
      xlab = "Time", 
      ylab = "Survival Probability", 
      col = c("#021636", "#bbceed", "#0a77f5"), 
@@ -684,7 +712,7 @@ plot(surv_fit,
      cex.main = 0.95) 
 
 legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
+       legend = c("Low Performer", "Average Performer", "High Performer"), 
        col = c("#021636", "#bbceed", "#0a77f5"), 
        lwd = 2)
 
@@ -694,25 +722,25 @@ axis(2, lwd = 1)  # Change y-axis thickness
 # Log Rank Test 
 
 logrank_test$MMSE_res_low <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, 
-         thirtile_res != 2, 
+  filter(VISCODE <= 9, 
+         thirtile_years != 2, 
          thirtile_PGS==1) %>% # Low PGS
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 ################################################################################
-# MMSE~Residual EA by Genetic Capacity (Middle)
+# MMSE~Thirtile Years for only average capacity individuals
 ################################################################################
 
 # Fit the Kaplan-Meier estimator
 
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==2) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
+  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS==2) %>%
+  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot
 
 plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (Middle PGS)", 
+     main = "Average EA capacity by Actual Years of Education", 
      xlab = "Time", 
      ylab = "Survival Probability", 
      col = c("#021636", "#bbceed", "#0a77f5"), 
@@ -721,7 +749,7 @@ plot(surv_fit,
      cex.main = 0.95) 
 
 legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
+       legend = c("Low Performer", "Average Performer", "High Performer"), 
        col = c("#021636", "#bbceed", "#0a77f5"), 
        lwd = 2)
 
@@ -731,25 +759,25 @@ axis(2, lwd = 1)  # Change y-axis thickness
 # Log Rank Test 
 
 logrank_test$MMSE_res_mid <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, 
-         thirtile_res != 1, 
+  filter(VISCODE <= 9, 
+         thirtile_years != 1, 
          thirtile_PGS==2) %>% # Middle PGS
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 ################################################################################
-# MMSE~Residual EA by Genetic Capacity (High)
+# MMSE~Thirtile Years for only High capacity individuals
 ################################################################################
 
 # Fit the Kaplan-Meier estimator
 
 surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_PGS==3) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_years, data = .)
+  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS==3) %>%
+  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
 # Create the Kaplan-Meier survival plot
 
 plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (High PGS)", 
+     main = "High EA capacity by Actual Years of Education", 
      xlab = "Time", 
      ylab = "Survival Probability", 
      col = c("#021636", "#bbceed", "#0a77f5"), 
@@ -758,7 +786,7 @@ plot(surv_fit,
      cex.main = 0.95) 
 
 legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
+       legend = c("Low Performer", "Average Performer", "High Performer"), 
        col = c("#021636", "#bbceed", "#0a77f5"), 
        lwd = 2)
 
@@ -768,10 +796,14 @@ axis(2, lwd = 1)  # Change y-axis thickness
 # Log Rank Test
 
 logrank_test$MMSE_res_high <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, 
-         thirtile_res != 2, 
+  filter(VISCODE <= 9, 
+         thirtile_years != 2, 
          thirtile_PGS==3) %>% # High PGS
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_res, data = .)
+  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
+
+logrank_test$MMSE_res_low$pvalue
+logrank_test$MMSE_res_mid$pvalue
+logrank_test$MMSE_res_high$pvalue
 ```
 
 
@@ -797,9 +829,6 @@ ggplot(long_dat %>% filter(!is.na(MMSE_cut)),
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
 
-Log Test Low: `r logrank_test$MMSE_res_low$pvalue`<br>
-Log Test Middle: `r logrank_test$MMSE_res_mid$pvalue`<br>
-Log Test High:`r logrank_test$MMSE_res_high$pvalue`
 
 ```{r, echo=FALSE, fig.width = 12}
 
