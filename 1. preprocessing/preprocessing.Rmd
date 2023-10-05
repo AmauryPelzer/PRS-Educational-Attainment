@@ -1,0 +1,459 @@
+---
+title: "PGS Educational Attainment - Preprocessing"
+author: Sebastian Marten & Amaury Pelzer
+output: rmdformats::robobook
+---
+
+```{r, include=FALSE}
+if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
+if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
+if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
+if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
+if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
+if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
+if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
+if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
+if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
+if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
+if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
+if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
+
+```
+
+# Data Preprocessing
+
+1.  First, I wanted to investigate which variables are time dependent and also exclude some that were clearly unnecessary (i.e., "SITE","COLPROT","ORIGPROT", "FLDSTRENG","FSVERSION","IMAGEUID", "Month_bl","Month","M","update_stamp").
+
+```{r, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+dat <- read.csv("data/ADNIMERGE.csv")
+
+time_test <- function(data, idvar, tvar) {
+  x <- data[, c(idvar, tvar)] %>% arrange(tvar)
+  time_dependent <- FALSE
+  unique_participants <- unique(x[, 1])
+  for (participant in unique_participants) {
+    participant_data <- x[x[, 1] == participant, 2]
+    if (length(unique(participant_data)) > 1) {
+      time_dependent <- TRUE
+      break
+    }
+  }
+  if (time_dependent) {
+    return(data.frame(variable = tvar, status = "Time Dependent"))
+  } else {
+    return(data.frame(variable = tvar, status = "Time Independent"))
+  }
+}
+
+results <- data.frame(variable = character(), status = character(), stringsAsFactors = FALSE)
+
+for (col in 1:length(colnames(dat))) {
+  result <- time_test(dat, "RID", colnames(dat)[col])
+  results <- rbind(results, result)
+}
+
+
+excluded_vars <- c("SITE","COLPROT","ORIGPROT","FLDSTRENG",
+                   "FSVERSION","IMAGEUID", "Month_bl","Month","M",
+                   "update_stamp", "FSVERSION_bl", "FLDSTRENG_bl", 
+                   "EXAMDATE_bl", "EXAMDATE", "Years_bl")
+
+ivars <- subset(results, status=="Time Independent") %>%
+  subset(!(variable %in% excluded_vars)) %>% subset(select=variable)
+
+nivars <- subset(results, status=="Time Dependent") %>% 
+  subset(!(variable %in% excluded_vars)) %>% subset(select=variable)
+
+rm(results, result, col)
+```
+
+2.  Merge time dependent and independent variables into the long_dat data frame. Also, I recoded the time points in the VISCODE variable into integers.
+
+```{r}
+long_dat <- dat[, c(ivars[,1], nivars[,1])] %>%
+  mutate(VISCODE = match(VISCODE, c("bl", "m03", "m06", "m12", "m18", "m24", 
+                                    "m30","m36", "m42", "m48", "m54", "m60", 
+                                    "m66", "m72","m78", "m84", "m90", "m96", 
+                                    "m102", "m108","m114", "m120", "m126", 
+                                    "m132", "m144", "m156"))-1) %>%
+  relocate(RID, PTID, VISCODE) %>%
+  arrange(RID, VISCODE)
+```
+
+3.  In the original data frame there were quite some \_bl or \_BL variables. Thus, I wanted to check whether these columns had already been integrated or not at each corresponding time point for each participant. Surprise, the test was negative.
+
+```{r, include= FALSE}
+baseline_vars <- long_dat %>%
+  select(c("VISCODE","PTID",ends_with("_bl"),ends_with("_BL"))) %>%
+  filter(VISCODE == 0) %>%
+  subset(select = -c(DX_bl, VISCODE)) %>%
+  rename(LDELTOTAL_bl = LDELTOTAL_BL)
+
+baseline_commplementary_vars <- long_dat %>% 
+  
+  subset(select = c(VISCODE, DX, CDRSB, ADAS11, ADAS13, ADASQ4,MMSE,
+  RAVLT_immediate,RAVLT_learning,RAVLT_forgetting,RAVLT_perc_forgetting,
+  LDELTOTAL,DIGITSCOR,TRABSCOR,FAQ,mPACCdigit,mPACCtrailsB,Ventricles,
+  Hippocampus,WholeBrain,Entorhinal,Fusiform,MidTemp,ICV,MOCA,EcogPtMem,
+  EcogPtLang,EcogPtVisspat,EcogPtPlan,EcogPtOrgan,EcogPtDivatt,EcogPtTotal,
+  EcogSPMem,EcogSPLang,EcogSPVisspat,EcogSPPlan,EcogSPOrgan,EcogSPDivatt,
+  EcogSPTotal,ABETA,TAU,PTAU,FDG,PIB,AV45)) %>%
+  
+  filter(VISCODE == 0) %>% 
+  subset(select = -c(DX, VISCODE))
+
+length(colnames(baseline_vars)) == length(colnames(baseline_commplementary_vars))
+all.equal(baseline_vars, baseline_commplementary_vars)
+```
+
+4.  Therefore, I continued with merging the \_bl/\_BL variables with the corresponding time dependent variable for each participant. Additionally, I specified the data type of each variable individually for optimal control and oversight over the data structure.
+
+```{r, include= FALSE}
+baseline_commplementary_col_names <- colnames(baseline_commplementary_vars)
+
+long_dat <- long_dat %>%
+  left_join(baseline_vars, by = "PTID", suffix = c("", "_bl")) %>%
+  mutate(across(all_of(baseline_commplementary_col_names), ~ coalesce(., get(paste0(cur_column(), "_bl"))))) %>%
+  select(-ends_with("_bl"), -ends_with("_BL")) %>%
+  mutate(
+    RID = as.factor(RID),
+    PTID = as.character(PTID),
+    VISCODE = as.numeric(VISCODE),
+    AGE = as.numeric(AGE),
+    PTGENDER = as.factor(PTGENDER),
+    PTEDUCAT = as.integer(PTEDUCAT),
+    PTETHCAT = as.factor(PTETHCAT),
+    PTRACCAT = as.factor(PTRACCAT),
+    PTMARRY = as.factor(PTMARRY),
+    APOE4 = as.integer(APOE4),
+    FDG = as.numeric(FDG),
+    PIB = as.numeric(PIB),
+    AV45 = as.numeric(AV45),
+    ABETA = as.numeric(ABETA),
+    TAU = as.numeric(TAU),
+    PTAU = as.numeric(PTAU),
+    CDRSB = as.numeric(CDRSB),
+    ADAS11 = as.numeric(ADAS11),
+    ADAS13 = as.numeric(ADAS13),
+    ADASQ4 = as.integer(ADASQ4),
+    MMSE = as.integer(MMSE),
+    RAVLT_immediate = as.integer(RAVLT_immediate),
+    RAVLT_learning = as.integer(RAVLT_learning),
+    RAVLT_forgetting = as.integer(RAVLT_forgetting),
+    RAVLT_perc_forgetting = as.numeric(RAVLT_perc_forgetting),
+    LDELTOTAL = as.integer(LDELTOTAL),
+    DIGITSCOR = as.integer(DIGITSCOR),
+    TRABSCOR = as.integer(TRABSCOR),
+    FAQ = as.integer(FAQ),
+    MOCA = as.integer(MOCA),
+    EcogPtMem = as.numeric(EcogPtMem),
+    EcogPtLang = as.numeric(EcogPtLang),
+    EcogPtVisspat = as.numeric(EcogPtVisspat),
+    EcogPtPlan = as.numeric(EcogPtPlan),
+    EcogPtOrgan = as.numeric(EcogPtOrgan),
+    EcogPtDivatt = as.numeric(EcogPtDivatt),
+    EcogPtTotal = as.numeric(EcogPtTotal),
+    EcogSPMem = as.numeric(EcogSPMem),
+    EcogSPLang = as.numeric(EcogSPLang),
+    EcogSPVisspat = as.numeric(EcogSPVisspat),
+    EcogSPPlan = as.numeric(EcogSPPlan),
+    EcogSPOrgan = as.numeric(EcogSPOrgan),
+    EcogSPDivatt = as.numeric(EcogSPDivatt),
+    EcogSPTotal = as.numeric(EcogSPTotal),
+    Ventricles = as.integer(Ventricles),
+    Hippocampus = as.integer(Hippocampus),
+    WholeBrain = as.integer(WholeBrain),
+    Entorhinal = as.integer(Entorhinal),
+    Fusiform = as.integer(Fusiform),
+    MidTemp = as.integer(MidTemp),
+    ICV = as.integer(ICV),
+    DX = as.factor(DX),
+    mPACCdigit = as.numeric(mPACCdigit),
+    mPACCtrailsB = as.numeric(mPACCtrailsB)
+    )
+```
+
+5.  Transform Long to Wide Data Format
+
+```{r, echo=FALSE}
+ivars <- ivars %>% filter(!str_detect(variable, "_bl|_BL") & variable != "DX_bl") %>%
+  pull(variable) %>%
+  as.character()
+
+nivars <- nivars %>% 
+  filter(! str_detect(variable, "VISCODE")) %>%
+  pull(variable) %>%
+  as.character()
+
+wide_dat <- pivot_wider(
+  long_dat,
+  id_cols = all_of(ivars),
+  names_from = "VISCODE",
+  values_from = all_of(nivars),
+  values_fn = list(n = n_distinct),
+  names_sep = "_"
+  )
+
+head(wide_dat)
+```
+
+# Age Distribution in Data Frame
+
+```{r, echo=FALSE, warning=FALSE}
+
+# Create histogram of general age range in data set
+
+ggplot(long_dat %>% distinct(RID, .keep_all = TRUE), aes(x = AGE)) +
+  geom_histogram(binwidth = 1, fill = "#bbceed", color = "black") +
+  geom_vline(xintercept = c(60, 70), linetype = "dashed", color = "#940914", size=1) +  # vertical lines age range
+  geom_vline(xintercept = c(65, 75), linetype = "dashed", color = "#940914", size=1) +  # vertical lines age range
+  labs(title = "Histogram Age Distribution",
+       x = "Age",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),  # Bold and centred title
+        axis.line = element_line(size = 0.5))  # Thicker axis lines
+
+# create data frames of two age groups
+
+age_60to70_df <- long_dat %>% # Data frame filtered for age
+  filter(AGE >= 60 & AGE <= 70)
+
+age_65to75_df <- long_dat %>% # Data frame filtered for age
+  filter(AGE >= 65 & AGE <= 75)
+
+age_60to75_df <- long_dat %>% # Data frame filtered for age
+  filter(AGE >= 60 & AGE <= 75)
+
+# AGE Groups (1,2,3 for 60-65, 66-70, 71-75)
+
+long_dat$Age_Group <- ifelse(
+  long_dat$AGE >= 60.0 & long_dat$AGE <= 65.0, 1,
+  ifelse(
+    long_dat$AGE >= 66.0 & long_dat$AGE <= 70.0, 2,
+    ifelse(
+      long_dat$AGE >= 71.0 & long_dat$AGE <= 75.0, 3,
+      NA_integer_
+    )
+  )
+)
+
+# Append to Wide data frame too 
+wide_dat <- wide_dat %>%
+  left_join(
+    long_dat %>% 
+      group_by(RID) %>%
+      filter(row_number() == 1) %>%  # Keep only the first row for each unique RID
+      select(RID, Age_Group),
+    by = "RID"
+  )
+```
+
+# Attrition Analysis
+
+Based on the number of participants measured at any time point I made a frequency plot to get a first idea of the sampling frequency.
+
+```{r, echo=FALSE, fig.align="center"}
+frequency_table <- long_dat %>%
+  group_by(VISCODE) %>%
+  summarise(NumParticipants = n_distinct(RID))
+
+barplot(frequency_table$NumParticipants~frequency_table$VISCODE, xlab="Time", ylab="Number of Patients Measured",
+     main="Attrition Plot")
+```
+
+# Domains
+
+## Demographics
+
+```{r, echo=FALSE}
+df_demographics <- long_dat %>%
+  select(RID, PTID, VISCODE, AGE, PTGENDER, PTEDUCAT, PTETHCAT, PTRACCAT, PTMARRY)
+
+freq_dem <- df_demographics %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_dem_long <- pivot_longer(freq_dem, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_dem_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
+```
+
+## Cognitive Tests
+
+```{r, echo=FALSE}
+df_cognitive_tests <- long_dat %>%
+  select(RID, PTID, VISCODE, CDRSB, ADAS11, ADAS13, ADASQ4, MMSE,
+         RAVLT_immediate, RAVLT_learning, RAVLT_forgetting, RAVLT_perc_forgetting,
+         LDELTOTAL, DIGITSCOR, TRABSCOR, FAQ, MOCA,
+         EcogPtMem, EcogPtLang, EcogPtVisspat, EcogPtPlan, EcogPtOrgan, EcogPtDivatt, EcogPtTotal,
+         EcogSPMem, EcogSPLang, EcogSPVisspat, EcogSPPlan, EcogSPOrgan, EcogSPDivatt, EcogSPTotal)
+
+freq_cog <- df_cognitive_tests %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_cog_long <- pivot_longer(freq_cog, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_cog_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
+```
+
+## Biomedical Imaging
+
+```{r,echo=FALSE}
+df_biomedical_imaging <- long_dat %>%
+  select(RID, PTID, VISCODE, Ventricles, Hippocampus, WholeBrain, Entorhinal, Fusiform, MidTemp, ICV)
+
+freq_imag <- df_biomedical_imaging %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_imag_long <- pivot_longer(freq_imag, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_imag_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
+```
+
+## Biomarkers
+
+```{r, echo=FALSE}
+df_biomarkers <- long_dat %>%
+  select(RID, PTID, VISCODE, APOE4, ABETA, TAU, PTAU, FDG, PIB, AV45)
+
+freq_mark <- df_biomarkers %>%
+  group_by(VISCODE) %>%
+  summarise(across(everything(), ~ sum(!is.na(.))))
+
+freq_mark_long <- pivot_longer(freq_mark, cols = -VISCODE, names_to = "Variable", values_to = "Frequency")
+
+ggplot(freq_mark_long, aes(x = VISCODE, y = Frequency, color = Variable, group = Variable)) +
+  geom_line() +
+  labs(x = "Timepoint (VISCODE)", y = "Number of Measurements", title = "Number of Measurements per Time Point") +
+  theme(legend.position = "top")
+```
+
+Based on these findings it appears that time point 9 is a cut-off where the number of measurements drop quite strongly. Time point 9 corresponds to month 42 (i.e., 3.5 years) of the follow-up.
+
+```{r, echo=FALSE}
+rm(list= setdiff(ls(), c("long_dat", "wide_dat")))
+```
+
+# Polygenic Score for Educational attainment
+
+```{r, echo=FALSE, message=FALSE}
+# Read in the PGS send to us by Rick
+pgs <- readr::read_tsv("data/ADNI_PRS_results_EA_EA22.tsv")
+
+# Merge the EA data with the corresponding participant in each data frame
+long_dat <- merge(long_dat, pgs,by.x="PTID",by.y="SampleID") 
+wide_dat <- merge(wide_dat, pgs,by.x="PTID",by.y="SampleID")
+```
+
+The merge(by.x, by.y) function creates a new data frame that only keeps those rows for which there is a matching key (in our case PTID). Therefore, we do have genetic data from 2 additional individuals for which we do not have any other measurements. The final data frame for which testing data and genetic data is available is thus, 1408 (N).
+
+## Plot PGS EA vs. Actual EA
+
+Based on this plot, we can see a positive relationship between the polygenic score for education attainment and actual years of education. This means that with a higher PGS score comes higher genetic capacity for educational attainment.
+
+We ran Pearson's correlation which resulted in r = 0.286 (p-value \< 2.2e-16)
+
+```{r, echo=FALSE, message=FALSE, results='hide'}
+# Plot PGS EA against Actual EA
+ggplot(long_dat, aes(x = PTEDUCAT, y = EA22)) +
+  geom_point() +  # Add points
+  geom_smooth(method = "lm") +  # Add linear regression line
+  labs(x = "Years of Education", y = "EA22") +  # Set axis labels
+  ggtitle("EA22 vs Years of Education")  # Set plot title
+
+cor(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
+cor.test(long_dat$PTEDUCAT, long_dat$EA22, method="pearson")
+```
+
+## Check linear regression assumptions
+
+```{r, echo=FALSE}
+lm(PTEDUCAT~PTGENDER, data=wide_dat)
+boxplot(PTEDUCAT~PTGENDER, data=wide_dat)
+
+lm(EA22~PTGENDER, data=wide_dat)
+boxplot(EA22~PTGENDER, data=wide_dat)
+
+# compare n gender
+table(wide_dat$PTGENDER)
+
+# Linear regression model
+model <- lm(PTEDUCAT~EA22+AGE+PTGENDER + AGE*PTGENDER,data=wide_dat)
+
+# Check model assumptions
+check_model(model)
+```
+
+## Create Residuals
+
+To get the residual we regressed the polygenic risk score for educational attainment against actual EA including the variables SEX & AGE as covariates. The results are depicted in the density plot.
+
+```{r, echo=FALSE}
+# Create the residuals given two covariates AGE and Sex
+results <- lm(PTEDUCAT~EA22+AGE+PTGENDER+AGE*PTGENDER,data=wide_dat)
+
+# Standardize the residuals and append to data frame
+wide_dat$res <- rstandard(results)
+
+# Create density plot of the residuals
+ggplot(wide_dat, aes(x = res)) +
+  geom_density(fill = "orange", alpha = 0.5) +
+  labs(x = "Residual Score", y = "Density") +
+  ggtitle("Distribution of Residuals")
+```
+
+## How to interpret the Residuals?
+
+It is important to correctly interpret the residual scores. The correct way to interpret them is, that a high residual score means that the individual has over-performed relative to his or her genetic capacity. See for example in this table for a short proof:
+
+```{r, echo=FALSE}
+residuals <- results$residuals # get residuals
+predicted_scores <- predict(results) # get predicted scores for each individual
+
+combined_df <- data.frame(Actual = wide_dat$PTEDUCAT, Predicted = as.numeric(predicted_scores), Residuals = as.numeric(residuals)) # Combine residuals, predicted scores, and actual scores into one data frame
+
+head(combined_df %>% filter(!duplicated(Actual))) # present data frame as example
+```
+
+```{r, echo=FALSE}
+# Create a residual plot
+ggplot() +
+  geom_qq(aes(sample = residuals)) +
+  geom_qq_line() +
+  labs(title = "Normal Q-Q Plot of Residuals") +
+  theme_minimal()
+```
+
+```{r, eval=FALSE}
+# Create a folder called "output" if it doesn't exist
+if (!file.exists("output")) {
+  dir.create("output")
+}
+
+# Save wide_dat as a CSV file in the "output" folder
+write.csv(wide_dat, file = "output/wide_dat.csv", row.names = FALSE)
+
+# Save long_dat as a CSV file in the "output" folder
+write.csv(long_dat, file = "output/long_dat.csv", row.names = FALSE)
+```
+
+## Print session info:
+
+```{r print_session_info}
+##Print session info:
+sessionInfo()
+```
