@@ -5,18 +5,18 @@ output: rmdformats::robobook
 ---
 
 ```{r, include=FALSE}
-if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
-if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
-if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
-if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
-if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
-if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
-if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
-if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
-if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
-if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
-if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
-if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
+#if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
+#if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
+#if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
+#if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
+#if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
+#if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
+#if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
+#if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
+#if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
+#if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
+#if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
+#if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
 
 ```
 
@@ -27,10 +27,169 @@ knitr::opts_chunk$set(echo = TRUE)
 
 long_dat <- read.csv("../1.\ preprocessing/output/long_dat.csv")
 wide_dat <- read.csv("../1.\ preprocessing/output/wide_dat.csv")
+```
+
+## Create functions
+
+```{r}
+plot_survival <- function(outcome_var_cut) {
+  
+  # Fit the Kaplan-Meier estimator (MMSE~PGS)
+  surv_fit_cox1 <- long_dat %>%
+    filter(VISCODE <= 9, AGE >= 60, AGE <= 75) %>%
+    coxph(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
+  
+  # Create the Kaplan-Meier survival plot (MMSE~PGS)
+  par(mfrow = c(1, 2))
+  # You can create a survival curve for the Cox model using survfit
+  surv_fit_cox_km1 <- survfit(surv_fit_cox1)
+  
+  plot(surv_fit_cox_km1, 
+       main = "Kaplan-Meier Survival Curve (MMSE~years)", 
+       xlab = "Time", 
+       ylab = "Survival Probability", 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2,
+       xlim = c(0, 10),
+       cex.main = 0.95) 
+  
+  legend("bottomleft", 
+         legend = c("Low Performance", "Average Performance", "High Performance"), 
+         col = c("#021636", "#bbceed", "#0a77f5"), 
+         lwd = 2)
+  
+  axis(1, lwd = 1)  # Change x-axis thickness
+  axis(2, lwd = 1)  # Change y-axis thickness
+  
+  # Fit the Kaplan-Meier estimator for Cox proportional hazards model (MMSE~PGS)
+  surv_fit_cox2 <- long_dat %>%
+    filter(VISCODE <= 9, AGE >= 60, AGE <= 75) %>%
+    coxph(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_PGS, data = .)
+  
+  # You can create a survival curve for the Cox model using survfit
+  surv_fit_cox_km2 <- survfit(surv_fit_cox2)
+  
+  plot(surv_fit_cox_km2, 
+       main = "Kaplan-Meier Survival Curve (MMSE~PGS)", 
+       xlab = "Time", 
+       ylab = "Survival Probability", 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2,
+       xlim = c(0, 10),
+       cex.main = 0.95) 
+  
+  legend("bottomleft", 
+         legend = c("Low capacity", "Average", "High capacity"), 
+         col = c("#021636", "#bbceed", "#0a77f5"), 
+         lwd = 2)
+  
+  axis(1, lwd = 1)  # Change x-axis thickness
+  axis(2, lwd = 1)  # Change y-axis thickness
+}
+```
 
 
+```{r}
+plot_survival_strat <- function(outcome_var_cut) {
+  
+  par(mfrow=c(1,3)) # Set parameters for plots
+
+  ################################################################################
+  # MMSE~Thirtile Years for only low capacity individuals
+  ################################################################################
+  
+  # Fit the Kaplan-Meier estimator
+
+  surv_fit <- long_dat %>%
+    filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
+    survfit(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
+  
+  # Create the Kaplan-Meier survival plot
+  
+  plot(surv_fit, 
+       main = "Low EA capacity by Actual Years of Education", 
+       xlab = "Time", 
+       ylab = "Survival Probability", 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2,
+       xlim = c(0, 10),
+       cex.main = 0.95) 
+  
+  legend("bottomleft", 
+         legend = c("Low Performer", "Average Performer", "High Performer"), 
+         col = c("#021636", "#bbceed", "#0a77f5"), 
+         lwd = 2)
+  
+  axis(1, lwd = 1)  # Change x-axis thickness
+  axis(2, lwd = 1)  # Change y-axis thickness
+  
+  ################################################################################
+  # MMSE~Thirtile Years for only average capacity individuals
+  ################################################################################
+  
+  # Fit the Kaplan-Meier estimator
+  
+  surv_fit <- long_dat %>%
+    filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
+    survfit(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
+  
+  # Create the Kaplan-Meier survival plot
+  
+  plot(surv_fit, 
+       main = "Average EA capacity by Actual Years of Education", 
+       xlab = "Time", 
+       ylab = "Survival Probability", 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2,
+       xlim = c(0, 10),
+       cex.main = 0.95) 
+  
+  legend("bottomleft", 
+         legend = c("Low Performer", "Average Performer", "High Performer"), 
+         col = c("#021636", "#bbceed", "#0a77f5"), 
+         lwd = 2)
+  
+  axis(1, lwd = 1)  # Change x-axis thickness
+  axis(2, lwd = 1)  # Change y-axis thickness
+  
+  ################################################################################
+  # MMSE~Thirtile Years for only High capacity individuals
+  ################################################################################
+  
+  # Fit the Kaplan-Meier estimator
+  
+  surv_fit <- long_dat %>%
+    filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
+    survfit(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
+  
+  # Create the Kaplan-Meier survival plot
+  
+  plot(surv_fit, 
+       main = "High EA capacity by Actual Years of Education", 
+       xlab = "Time", 
+       ylab = "Survival Probability", 
+       col = c("#021636", "#bbceed", "#0a77f5"), 
+       lwd = 2,
+       xlim = c(0, 10),
+       cex.main = 0.95) 
+  
+  legend("bottomleft", 
+         legend = c("Low Performer", "Average Performer", "High Performer"), 
+         col = c("#021636", "#bbceed", "#0a77f5"), 
+         lwd = 2)
+  
+  axis(1, lwd = 1)  # Change x-axis thickness
+  axis(2, lwd = 1)  # Change y-axis thickness
+}
 
 ```
+
+```{r}
+plot_survival("MMSE_cut")
+plot_survival_strat("MMSE_cut")
+```
+
+
 
 # Survival Analysis
 
@@ -84,48 +243,6 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group
 
 ```
 
-
-```{r, echo=FALSE}
-
-long_dat$RID <- as.character(long_dat$RID)
-long_dat$VISCODE <- as.numeric(long_dat$VISCODE)
-long_dat$thirtile_PGS <- as.character(long_dat$thirtile_PGS)
-long_dat$thirtile_res <- as.character(long_dat$thirtile_res)
-long_dat$thirtile_years <- as.character(long_dat$thirtile_years)
-
-# Mixed Model predicting MMSE score based on PGS EA
-model1 <- lme(MMSE_norm~EA22*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-summary(model1)
-
-# Mixed Model predicting MMSE score based on Actual EA
-model2 <- lme(MMSE_norm~PTEDUCAT*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-summary(model2)
-
-# Mixed Model predicting MMSE score based on residual EA scores
-model3 <- lme(MMSE_norm~res*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-summary(model3)
-
-# Mixed Model predicting MMSE score based on thirtiles of PGS EA
-model4 <- lme(MMSE_norm~thirtile_PGS*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-summary(model4)
-
-# Mixed Model predicting MMSE score based on thirtiles of Years
-model5 <- lme(MMSE_norm~thirtile_years*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-summary(model5)
-
-# Mixed Model predicting MMSE score based on Thirtile Residuals
-model6 <- lme(MMSE_norm~thirtile_res*VISCODE+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-summary(model6)
-
-model7 <- lme(MMSE_norm~VISCODE*PTEDUCAT*EA22+AGE+PTGENDER + AGE*PTGENDER, random = ~1|RID, data=long_dat)
-
-model8 <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
-  lme(MMSE_norm~VISCODE*PTEDUCAT*EA22, random = ~1|RID, data=.)
-summary(model8)
-anova(model1)
-
-```
 
 ### Boxplots of MMSE by Age Group at Baseline
 
@@ -641,6 +758,11 @@ ggplot(long_dat %>% filter(!is.na(ADAS11_cut)),
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
 ```
+
+```{r}
+analyze_and_plot_survival("ADAS11_cut")
+```
+
 
 ### ADAS13
 
