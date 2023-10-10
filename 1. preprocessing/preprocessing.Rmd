@@ -438,7 +438,7 @@ ggplot() +
   theme_minimal()
 ```
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, echo=FALSE}
 # Create a folder called "output" if it doesn't exist
 if (!file.exists("output")) {
   dir.create("output")
@@ -453,7 +453,7 @@ write.csv(long_dat, file = "output/long_dat.csv", row.names = FALSE)
 
 ## Print session info:
 
-```{r print_session_info}
+```{r print_session_info, echo=FALSE}
 ##Print session info:
 sessionInfo()
 ```

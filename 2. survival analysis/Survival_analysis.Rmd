@@ -5,18 +5,20 @@ output: rmdformats::robobook
 ---
 
 ```{r, include=FALSE}
+if (suppressWarnings(!require(dplyr))) {install.packages("dplyr"); library(dplyr)}
 #if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
 #if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
 #if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
 #if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
-#if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
+if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
 #if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
 #if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
 #if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
-#if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
-#if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
-#if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
+if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
+if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
+if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
 #if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
+if (suppressWarnings(!require(survminer))) {install.packages("survminer"); library(survminer)}
 
 ```
 
@@ -25,170 +27,92 @@ output: rmdformats::robobook
 ```{r, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+# Load in data from preprocessing and apply filter
 long_dat <- read.csv("../1.\ preprocessing/output/long_dat.csv")
+
 wide_dat <- read.csv("../1.\ preprocessing/output/wide_dat.csv")
 ```
 
 ## Create functions
 
+
 ```{r}
-plot_survival <- function(outcome_var_cut) {
+# Calculates cut-off values using mean + 2SD of control (cognitively normal) at baseline
+calc_pos_cvalue <- function(variable) {
+  var_bl <- paste0(deparse(substitute(variable)), "_0")
   
-  # Fit the Kaplan-Meier estimator (MMSE~PGS)
-  surv_fit_cox1 <- long_dat %>%
-    filter(VISCODE <= 9, AGE >= 60, AGE <= 75) %>%
-    coxph(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
-  
-  # Create the Kaplan-Meier survival plot (MMSE~PGS)
-  par(mfrow = c(1, 2))
-  # You can create a survival curve for the Cox model using survfit
-  surv_fit_cox_km1 <- survfit(surv_fit_cox1)
-  
-  plot(surv_fit_cox_km1, 
-       main = "Kaplan-Meier Survival Curve (MMSE~years)", 
-       xlab = "Time", 
-       ylab = "Survival Probability", 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2,
-       xlim = c(0, 10),
-       cex.main = 0.95) 
-  
-  legend("bottomleft", 
-         legend = c("Low Performance", "Average Performance", "High Performance"), 
-         col = c("#021636", "#bbceed", "#0a77f5"), 
-         lwd = 2)
-  
-  axis(1, lwd = 1)  # Change x-axis thickness
-  axis(2, lwd = 1)  # Change y-axis thickness
-  
-  # Fit the Kaplan-Meier estimator for Cox proportional hazards model (MMSE~PGS)
-  surv_fit_cox2 <- long_dat %>%
-    filter(VISCODE <= 9, AGE >= 60, AGE <= 75) %>%
-    coxph(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_PGS, data = .)
-  
-  # You can create a survival curve for the Cox model using survfit
-  surv_fit_cox_km2 <- survfit(surv_fit_cox2)
-  
-  plot(surv_fit_cox_km2, 
-       main = "Kaplan-Meier Survival Curve (MMSE~PGS)", 
-       xlab = "Time", 
-       ylab = "Survival Probability", 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2,
-       xlim = c(0, 10),
-       cex.main = 0.95) 
-  
-  legend("bottomleft", 
-         legend = c("Low capacity", "Average", "High capacity"), 
-         col = c("#021636", "#bbceed", "#0a77f5"), 
-         lwd = 2)
-  
-  axis(1, lwd = 1)  # Change x-axis thickness
-  axis(2, lwd = 1)  # Change y-axis thickness
+  value <- wide_dat %>%
+    filter(DX_0 == "CN") %>%
+    summarize(
+      {{ variable }} := mean(.[[ var_bl ]], na.rm = TRUE) + 2 * sd(.[[ var_bl ]], na.rm = TRUE)
+    ) %>%
+    pull({{ variable }})  # Extract the calculated value
+    
+  return(value)
 }
-```
 
 
-```{r}
-plot_survival_strat <- function(outcome_var_cut) {
-  
-  par(mfrow=c(1,3)) # Set parameters for plots
+filter_data <- function(outcome_var){
+  cox_filtered_dat <- cox_filtered_dat %>%
+    group_by(RID) %>%
+    mutate(tRecovery = ifelse(lag({{outcome_var}} == 1) & {{outcome_var}} == 0, 1, 0),
+           tRecovery = ifelse(is.na(tRecovery),0,tRecovery),
+           ntRecovery = ifelse(any(tRecovery == 1),1,0),)%>%
+    filter(ntRecovery==0) %>%
+    relocate({{outcome_var}}, .before=tRecovery)
+}
 
-  ################################################################################
-  # MMSE~Thirtile Years for only low capacity individuals
-  ################################################################################
-  
-  # Fit the Kaplan-Meier estimator
 
-  surv_fit <- long_dat %>%
-    filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
-    survfit(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
+# Fits a Cox Hazards model on a data frame
+fit_coxph <- function(event, filtered_data_frame){
+  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+AGE+PTGENDER+AGE*PTGENDER, # Polygenic Risk Score EA
+                 data = filtered_data_frame)
+}
+
+
+# Plots the survival curve of a Cox Hazards model
+plot_coxph <- function(coxph_model){
+  pgs_df<- with(cox_filtered_dat,
+  data.frame(
+  thirtile_PGS = c("Low PGS","Medium PGS","High PGS"),
+  AGE = rep(mean(cox_filtered_dat$AGE), 3),
+  PTGENDER = c("Male","Male","Male"))
+  )
   
-  # Create the Kaplan-Meier survival plot
+  ggsurvplot(
+    survfit(coxph_model, newdata = pgs_df),
+    data = cox_filtered_dat,
+    legend.labs = c("Low PGS","Medium PGS","High PGS"),
+    ggtheme = theme_minimal() +
+      theme(
+        panel.grid.major = element_line(color = "gray"),
+        panel.grid.minor = element_line(color = "gray", size = 0.2)
+      ),
+    title = "Survival Curve (MMSE_cut ~ PGS + AGE + GENDER + AGExGENDER)",
+    xlab = "Time",
+    ylab = "Survival Probability",
+    xlim = c(1.5, 11),
+    palette = c("#021636", "#bbceed", "#0a77f5"),
+    conf.int = FALSE  # Show confidence intervals
+  )
+}
+
+
+# Tests model assumption for the model
+test_coxph <- function(coxph_model, outcome_var, filtered_data_frame){
+  # Testing Proportional Hazards
+  test.ph <- cox.zph(coxph_model)
+  test.ph
+  ggcoxzph(test.ph)
   
-  plot(surv_fit, 
-       main = "Low EA capacity by Actual Years of Education", 
-       xlab = "Time", 
-       ylab = "Survival Probability", 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2,
-       xlim = c(0, 10),
-       cex.main = 0.95) 
-  
-  legend("bottomleft", 
-         legend = c("Low Performer", "Average Performer", "High Performer"), 
-         col = c("#021636", "#bbceed", "#0a77f5"), 
-         lwd = 2)
-  
-  axis(1, lwd = 1)  # Change x-axis thickness
-  axis(2, lwd = 1)  # Change y-axis thickness
-  
-  ################################################################################
-  # MMSE~Thirtile Years for only average capacity individuals
-  ################################################################################
-  
-  # Fit the Kaplan-Meier estimator
-  
-  surv_fit <- long_dat %>%
-    filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
-    survfit(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
-  
-  # Create the Kaplan-Meier survival plot
-  
-  plot(surv_fit, 
-       main = "Average EA capacity by Actual Years of Education", 
-       xlab = "Time", 
-       ylab = "Survival Probability", 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2,
-       xlim = c(0, 10),
-       cex.main = 0.95) 
-  
-  legend("bottomleft", 
-         legend = c("Low Performer", "Average Performer", "High Performer"), 
-         col = c("#021636", "#bbceed", "#0a77f5"), 
-         lwd = 2)
-  
-  axis(1, lwd = 1)  # Change x-axis thickness
-  axis(2, lwd = 1)  # Change y-axis thickness
-  
-  ################################################################################
-  # MMSE~Thirtile Years for only High capacity individuals
-  ################################################################################
-  
-  # Fit the Kaplan-Meier estimator
-  
-  surv_fit <- long_dat %>%
-    filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
-    survfit(Surv(VISCODE, get(outcome_var_cut)) ~ thirtile_years, data = .)
-  
-  # Create the Kaplan-Meier survival plot
-  
-  plot(surv_fit, 
-       main = "High EA capacity by Actual Years of Education", 
-       xlab = "Time", 
-       ylab = "Survival Probability", 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2,
-       xlim = c(0, 10),
-       cex.main = 0.95) 
-  
-  legend("bottomleft", 
-         legend = c("Low Performer", "Average Performer", "High Performer"), 
-         col = c("#021636", "#bbceed", "#0a77f5"), 
-         lwd = 2)
-  
-  axis(1, lwd = 1)  # Change x-axis thickness
-  axis(2, lwd = 1)  # Change y-axis thickness
+  # Testing Outliers & Influential Cases
+  ggcoxdiagnostics(coxph_model,
+                   type = "dfbeta",
+                   linear.predictions = FALSE,
+                   ggtheme=theme_bw())
 }
 
 ```
-
-```{r}
-plot_survival("MMSE_cut")
-plot_survival_strat("MMSE_cut")
-```
-
 
 
 # Survival Analysis
@@ -297,390 +221,84 @@ rm(filtered_long_dat, box1, box2, res, res2)
 
 Next the survival analysis was conducted for the genetic capacity of educational attainment and the residual educational attainment.
 
-```{r, echo=FALSE, fig.width = 10}
-################################################################################
-# MMSE~Thirtle of Actual EA
-################################################################################
+## Data Filtering
 
-# Fit the Kaplan-Meier estimator (MMSE~PGS)
+```{r}
+cox_filtered_dat <- long_dat %>% # filter the data 
+  filter(VISCODE <= 9, AGE >= 60, AGE <= 75) %>%
+  #select(RID, VISCODE, AGE, PTGENDER, MMSE_norm, MMSE_cut, thirtile_res, thirtile_PGS, thirtile_years) %>%
+  arrange(RID, VISCODE) %>%
+  mutate(GENDER = ifelse(PTGENDER== "Male", 0,1), # Calculate numerical Gender variable
+         AGExGENDER = AGE*GENDER, # Calculate interaction term manually
+         VISCODE = VISCODE + 1,
+         thirtile_PGS = case_when(
+           thirtile_PGS == 1 ~ "Low PGS",
+           thirtile_PGS == 2 ~ "Medium PGS",
+           thirtile_PGS == 3 ~ "High PGS", 
+           TRUE ~ as.character(thirtile_PGS)
+           )
+         )
 
-surv_fit <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
-  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
+cox_filtered_dat <- cox_filtered_dat %>%
+  group_by(RID) %>%
+  mutate(tstart = ifelse(VISCODE == 1, 0, lag(VISCODE)),
+         tstop = ifelse(VISCODE != 1, VISCODE, 1),
+         tRecovery = ifelse(lag(MMSE_cut == 1) & MMSE_cut == 0, 1, 0),
+         tRecovery = ifelse(is.na(tRecovery),0,tRecovery),
+         ntRecovery = ifelse(any(tRecovery == 1),1,0),)%>%
+  filter(ntRecovery==0) %>%
+  relocate(MMSE_cut, .before=tRecovery)
 
-# Create the Kaplan-Meier survival plot (MMSE~PGS)
-par(mfrow=c(1,3))
-
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (MMSE~years)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low Performance", "Average Performance", "High Performance"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test (MMSE~PGS)
-logrank_test$MMSE_years <- long_dat %>%
-  filter(VISCODE <= 9, thirtile_years != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-logrank_test$MMSE_years <- long_dat %>%
-  filter(VISCODE <= 9, thirtile_years != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-################################################################################
-# MMSE~Thirtile of PGS EA
-################################################################################
-
-# Fit the Kaplan-Meier estimator (MMSE~PGS)
-long_dat$thirtile_PGS <- as.factor(long_dat$thirtile_PGS)
-long_dat$thirtile_years <- as.factor(long_dat$thirtile_years)
-long_dat$thirtile_PGS_rel <- relevel(long_dat$thirtile_PGS, "2")
-long_dat$thirtile_years_rel <- relevel(long_dat$thirtile_years, "2")
-
-
-surv_fit <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_years == "2") %>%
-  coxph(Surv(VISCODE, MMSE_cut) ~ thirtile_PGS_rel, data = .)
-
-
-subset <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS == "2")
-
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (MMSE~PGS)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low capacity", "Average", "High capacity"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test (MMSE~PGS)
-logrank_test$MMSE_PGS <- long_dat %>%
-  filter(VISCODE <= 9, thirtile_PGS != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_PGS, data = .)
-
-################################################################################
-# MMSE~Residual EA
-################################################################################
-
-# Fit the Kaplan-Meier estimator (MMSE~res)
-
-surv_fit <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75) %>%
-  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot (MMSE~res)
-
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (MMSE~res)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95)  # Adjust the size of the title 
-
-legend("bottomleft", 
-       legend = c("Underperformed", "Average", "Overperformed"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test (MMSE~res)
-
-logrank_test$MMSE_res <- long_dat %>%
-  filter(VISCODE <= 9, thirtile_res != 2, AGE>=60, AGE<=75) %>%
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_res, data = .)
-
-logrank_test$MMSE_years$pvalue
-logrank_test$MMSE_PGS$pvalue
-logrank_test$MMSE_res$pvalue
+cox_filtered_dat <- cox_filtered_dat %>%
+  mutate(thirtile_PGS= as.factor(thirtile_PGS),
+         AGE = as.numeric(AGE),
+         GENDER = as.factor(GENDER),
+         PTGENDER = as.factor(PTGENDER)) 
 ```
 
-```{r, echo=FALSE, fig.width = 12}
+# Descriptive Statistics
 
-par(mfrow=c(1,3)) # Set parameters for plots
+```{r}
+length(unique(long_dat$RID)) # Number of individuals overall
 
-################################################################################
-# MMSE~Thirtile Years for only low capacity individuals
-################################################################################
+length(unique(cox_filtered_dat$RID)) # Number of unique individuals in the analysis
 
-# Fit the Kaplan-Meier estimator
+print(gender_counts <- cox_filtered_dat %>% # Number of Males/Females in Sample
+  distinct(RID, .keep_all = TRUE) %>%  
+  group_by(PTGENDER) %>%
+  summarize(Count = n()))
 
-surv_fit <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS==1) %>%
-  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
 
-# Create the Kaplan-Meier survival plot
-
-plot(surv_fit, 
-     main = "Low EA capacity by Actual Years of Education", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low Performer", "Average Performer", "High Performer"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-
-logrank_test$MMSE_res_low <- long_dat %>%
-  filter(VISCODE <= 9, 
-         thirtile_years != 2, 
-         thirtile_PGS==1) %>% # Low PGS
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-################################################################################
-# MMSE~Thirtile Years for only average capacity individuals
-################################################################################
-
-# Fit the Kaplan-Meier estimator
-
-surv_fit <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS==2) %>%
-  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-# Create the Kaplan-Meier survival plot
-
-plot(surv_fit, 
-     main = "Average EA capacity by Actual Years of Education", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low Performer", "Average Performer", "High Performer"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-
-logrank_test$MMSE_res_mid <- long_dat %>%
-  filter(VISCODE <= 9, 
-         thirtile_years != 1, 
-         thirtile_PGS==2) %>% # Middle PGS
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-################################################################################
-# MMSE~Thirtile Years for only High capacity individuals
-################################################################################
-
-# Fit the Kaplan-Meier estimator
-
-surv_fit <- long_dat %>%
-  filter(VISCODE <= 9, AGE>=60, AGE<=75, thirtile_PGS==3) %>%
-  survfit(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-# Create the Kaplan-Meier survival plot
-
-plot(surv_fit, 
-     main = "High EA capacity by Actual Years of Education", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low Performer", "Average Performer", "High Performer"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test
-
-logrank_test$MMSE_res_high <- long_dat %>%
-  filter(VISCODE <= 9, 
-         thirtile_years != 2, 
-         thirtile_PGS==3) %>% # High PGS
-  survdiff(Surv(VISCODE, MMSE_cut) ~ thirtile_years, data = .)
-
-logrank_test$MMSE_res_low$pvalue
-logrank_test$MMSE_res_mid$pvalue
-logrank_test$MMSE_res_high$pvalue
+print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
+  group_by(VISCODE) %>%
+  summarize(Count = n()))
 ```
 
 
-```{r, include=FALSE}
-################################################################################
-# Histogram # people by time point by group by outcome
-################################################################################
+```{r}
+cox_filtered_dat$thirtile_PGS <- factor(cox_filtered_dat$thirtile_PGS, levels = c("Low PGS","Medium PGS","High PGS")) # Adjust PGS to String for clearer Interpretation
 
-ggplot(long_dat %>% filter(!is.na(MMSE_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(MMSE_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS, ref="Medium PGS")) # Change the Reference Level of the PGS factor
+
 ```
 
+```{r}
+# Creates Cox Proportional Harzards regression model
+res.cox <- fit_coxph("MMSE_cut", cox_filtered_dat)
 
-```{r, echo=FALSE, fig.width = 12}
+# Results of Models
+summary(res.cox)
 
-par(mfrow=c(1,3)) # Set parameters for plots
+# Plots the Cox model
+plot_coxph(res.cox)
 
-################################################################################
-# MMSE~ by Genetic Capacity by Residual EA (Underachiever)
-################################################################################
+# Tests model assumptions
+test_coxph(res.cox, "MMSE_cut", cox_filtered_dat)
 
-# Fit the Kaplan-Meier estimator
-
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_years==1) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-
-# Create the Kaplan-Meier survival plot
-
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (Underachiever)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low PGS", "Middle PGS", "High PGS"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-
-logrank_test$MMSE_PGS_low <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, 
-         thirtile_PGS != 2, 
-         thirtile_res==1) %>% # Low PGS
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-
-################################################################################
-# MMSE~ by Genetic Capacity by Residual EA (Average Performance)
-################################################################################
-
-# Fit the Kaplan-Meier estimator
-
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_years==2) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-
-# Create the Kaplan-Meier survival plot
-
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (Average Performance)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low PGS", "Middle PGS", "High PGS"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-
-logrank_test$MMSE_PGS_mid <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, 
-         thirtile_PGS != 2, 
-         thirtile_res==2) %>% # Middle PGS
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-
-################################################################################
-# MMSE~ by Genetic Capacity by Residual EA (Overachiever)
-################################################################################
-
-# Fit the Kaplan-Meier estimator
-
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, AGE>=60, AGE<=75, thirtile_years==3) %>%
-  survfit(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
-
-# Create the Kaplan-Meier survival plot
-
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve (Overachiever)", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10),
-     cex.main = 0.95) 
-
-legend("bottomleft", 
-       legend = c("Low PGS", "Middle PGS", "High PGS"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test
-
-logrank_test$MMSE_PGS_high <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, 
-         thirtile_PGS != 2, 
-         thirtile_res==3) %>% # High PGS
-  survdiff(Surv(as.integer(VISCODE), MMSE_cut) ~ thirtile_PGS, data = .)
+# Testing Non-Linearity
+ggcoxfunctional(Surv(VISCODE, MMSE_cut) ~ AGE, data = cox_filtered_dat)
 ```
 
-Log Test Underachiever: `r logrank_test$MMSE_PGS_low$pvalue`<br>
-Log Test Average Performance: `r logrank_test$MMSE_PGS_mid$pvalue`<br>
-Log Test Overachiever:`r logrank_test$MMSE_PGS_high$pvalue`
 
 ## Alzheimer's Disease Assessment Scale
 
@@ -695,128 +313,53 @@ In addition, the score of the task 4 (Word Recognition, ADASQ4) was included in 
 ### ADAS11
 
 ```{r, echo=FALSE, message=FALSE}
+cvalue$ADAS11 <- calc_pos_cvalue(ADAS11)
 
-calculate_cvalue <- function(variable) {
-  var_bl <- paste0(deparse(substitute(variable)), "_0")
-  
-  value <- wide_dat %>%
-    filter(DX_0 == "CN") %>%
-    summarize(
-      {{ variable }} := mean(.[[ var_bl ]], na.rm = TRUE) + 2 * sd(.[[ var_bl ]], na.rm = TRUE)
-    ) %>%
-    pull({{ variable }})  # Extract the calculated value
-    
-  return(value)
-}
+cox_filtered_dat$ADAS11_cut <- ifelse(cox_filtered_dat$ADAS11 > cvalue$ADAS11, 1, 0)
 
-cvalue$ADAS11 <- calculate_cvalue(ADAS11)
+cox_filtered_dat <- filter_data(ADAS11_cut)
 
-long_dat$ADAS11_cut <- ifelse(long_dat$ADAS11 > cvalue$ADAS11, 1, 0)
+# Creates Cox Proportional Harzards regression model
+res.cox <- fit_coxph("ADAS11_cut", cox_filtered_dat)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), ADAS11_cut) ~ thirtile_res, data = .)
+# Results of Models
+summary(res.cox)
 
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
+# Plots the Cox model
+plot_coxph(res.cox)
 
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
+# Tests model assumptions
+test_coxph(res.cox, "ADAS11_cut", cox_filtered_dat)
 
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$ADAS11 <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9, thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), ADAS11_cut) ~ thirtile_res, data = .)
-logrank_test$ADAS11
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(ADAS11_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(ADAS11_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+# Testing Non-Linearity
+ggcoxfunctional(Surv(VISCODE, ADAS11_cut) ~ AGE, data = cox_filtered_dat)
 ```
-
-```{r}
-analyze_and_plot_survival("ADAS11_cut")
-```
-
 
 ### ADAS13
 
 "The ADAS13 was included as a global measure of cognitive function. ADAS13 is a test battery developed to assess severity of cognitive impairment associated with AD and includes subtests and clinical evaluations assessing memory function, reasoning, language function, orientation and praxis. The ADAS13 is a modified version of the original ADAS-Cog-11, adding a cancellation task and a delayed free recall task. The higher the scores, the more severe impairment of cognitive function." (Mofrad et al., 2021)
 
 ```{r, echo=FALSE, message=FALSE}
-cvalue$ADAS13 <- calculate_cvalue(ADAS13)
+cvalue$ADAS13 <- calc_pos_cvalue(ADAS13)
 
-long_dat$ADAS13_cut <- ifelse(long_dat$ADAS13 > cvalue$ADAS13, 1, 0)
+cox_filtered_dat$ADAS13_cut <- ifelse(cox_filtered_dat$ADAS13 > cvalue$ADAS13, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), ADAS13_cut) ~ thirtile_res, data = .)
+cox_filtered_dat <- filter_data(ADAS13_cut)
 
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
+# Creates Cox Proportional Harzards regression model
+res.cox <- fit_coxph("ADAS13_cut", cox_filtered_dat)
 
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
+# Results of Models
+summary(res.cox)
 
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
+# Plots the Cox model
+plot_coxph(res.cox)
 
-# Log Rank Test 
-logrank_test$ADAS13 <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), ADAS13_cut) ~ thirtile_res, data = .)
-logrank_test$ADAS13
+# Tests model assumptions
+test_coxph(res.cox, "ADAS13_cut", cox_filtered_dat)
 
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(ADAS13_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(ADAS13_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+# Testing Non-Linearity
+ggcoxfunctional(Surv(VISCODE, ADAS13_cut) ~ AGE, data = cox_filtered_dat)
 ```
 
 ### ADASQ4
@@ -826,50 +369,8 @@ cvalue$ADASQ4 <- calculate_cvalue(ADASQ4)
 
 long_dat$ADASQ4_cut <- ifelse(long_dat$ADASQ4 > cvalue$ADASQ4, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), ADASQ4_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$ADASQ4 <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), ADASQ4_cut) ~ thirtile_res, data = .)
-logrank_test$ADASQ4
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(ADASQ4_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(ADASQ4_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("ADAS11_cut")
+plot_survival_strat("ADAS11_cut")
 ```
 
 ## CDRSB
@@ -883,50 +384,8 @@ cvalue$CDRSB <- calculate_cvalue(CDRSB)
 
 long_dat$CDRSB_cut <- ifelse(long_dat$CDRSB > cvalue$CDRSB, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), CDRSB_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$CDRSB <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), CDRSB_cut) ~ thirtile_res, data = .)
-logrank_test$CDRSB
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(CDRSB_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(CDRSB_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("CDRSB_cut")
+plot_survival_strat("CDRSB_cut")
 ```
 
 ## DIGITSCORE
@@ -943,50 +402,8 @@ cvalue$DIGITSCOR <- wide_dat %>%
 
 long_dat$DIGITSCOR_cut <- ifelse(long_dat$DIGITSCOR < cvalue$DIGITSCOR, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), DIGITSCOR_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$DIGITSCOR <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), DIGITSCOR_cut) ~ thirtile_res, data = .)
-logrank_test$DIGITSCOR
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(DIGITSCOR_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(DIGITSCOR_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("DIGITSCOR_cut")
+plot_survival_strat("DIGITSCOR_cut")
 ```
 
 ## FAQ
@@ -998,50 +415,8 @@ cvalue$FAQ <- 5
 
 long_dat$FAQ_cut <- ifelse(long_dat$FAQ > cvalue$FAQ, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), FAQ_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$FAQ <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), FAQ_cut) ~ thirtile_res, data = .)
-logrank_test$FAQ
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(FAQ_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(FAQ_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("FAQ_cut")
+plot_survival_strat("FAQ_cut")
 ```
 
 ## LDELTOTAL
@@ -1056,50 +431,8 @@ cvalue$LDELTOTAL <- wide_dat %>%
 
 long_dat$LDELTOTAL_cut <- ifelse(long_dat$LDELTOTAL < cvalue$LDELTOTAL, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), LDELTOTAL_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$LDELTOTAL <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), LDELTOTAL_cut) ~ thirtile_res, data = .)
-logrank_test$LDELTOTAL
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(LDELTOTAL_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(LDELTOTAL_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("LDELTOTAL_cut")
+plot_survival_strat("LDELTOTAL_cut")
 ```
 
 ## MOCA
@@ -1109,50 +442,8 @@ Reference literature: doi: 10.1111/j.1532-5415.2005.53221.x
 ```{r, echo=FALSE, message=FALSE}
 long_dat$MOCA_cut <- ifelse(long_dat$MOCA < 26, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), MOCA_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$MOCA <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), MOCA_cut) ~ thirtile_res, data = .)
-logrank_test$MOCA
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(MOCA_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(MOCA_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("MOCA_cut")
+plot_survival_strat("MOCA_cut")
 ```
 
 ## Rey-Auditory Verbal Learning Test (RAVLT)
@@ -1173,50 +464,8 @@ cvalue$RAVLT_immediate <- wide_dat %>%
 
 long_dat$RAVLT_immediate_cut <- ifelse(long_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$RAVLT_immediate <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), RAVLT_immediate_cut) ~ thirtile_res, data = .)
-logrank_test$RAVLT_immediate
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(RAVLT_immediate_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(RAVLT_immediate_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("RAVLT_immediate_cut")
+plot_survival_strat("RAVLT_immediate_cut")
 ```
 
 ### RAVLT Percentage Forgetting
@@ -1226,50 +475,8 @@ cvalue$RAVLT_perc_forgetting <- calculate_cvalue(RAVLT_perc_forgetting)
 
 long_dat$RAVLT_perc_forgetting_cut <- ifelse(long_dat$RAVLT_perc_forgetting > cvalue$RAVLT_perc_forgetting, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), RAVLT_perc_forgetting_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$RAVLT_perc_forgetting <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), RAVLT_perc_forgetting_cut) ~ thirtile_res, data = .)
-logrank_test$RAVLT_perc_forgetting
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(RAVLT_perc_forgetting_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(RAVLT_perc_forgetting_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("RAVLT_perc_forgetting_cut")
+plot_survival_strat("RAVLT_perc_forgetting_cut")
 ```
 
 ### RAVLT Forgetting
@@ -1279,50 +486,8 @@ cvalue$RAVLT_forgetting <- calculate_cvalue(RAVLT_forgetting)
 
 long_dat$RAVLT_forgetting_cut <- ifelse(long_dat$RAVLT_forgetting > cvalue$RAVLT_forgetting, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$RAVLT_forgetting <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), RAVLT_forgetting_cut) ~ thirtile_res, data = .)
-logrank_test$RAVLT_forgetting
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(RAVLT_forgetting_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(RAVLT_forgetting_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("RAVLT_forgetting_cut")
+plot_survival_strat("RAVLT_forgetting_cut")
 ```
 
 ### RAVLT Learning
@@ -1332,51 +497,8 @@ cvalue$RAVLT_learning <- calculate_cvalue(RAVLT_learning)
 
 long_dat$RAVLT_learning_cut <- ifelse(long_dat$RAVLT_learning > cvalue$RAVLT_learning, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), RAVLT_learning_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$RAVLT_learning <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), RAVLT_learning_cut) ~ thirtile_res, data = .)
-logrank_test$RAVLT_learning
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(RAVLT_learning_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(RAVLT_learning_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
-
+plot_survival("RAVLT_learning_cut")
+plot_survival_strat("RAVLT_learning_cut")
 ```
 
 ## TRABSCORE
@@ -1392,50 +514,8 @@ cvalue$TRABSCOR <- calculate_cvalue(TRABSCOR)
 
 long_dat$TRABSCOR_cut <- ifelse(long_dat$TRABSCOR > cvalue$TRABSCOR, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), TRABSCOR_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$TRABSCOR <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), TRABSCOR_cut) ~ thirtile_res, data = .)
-logrank_test$TRABSCOR
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(TRABSCOR_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(TRABSCOR_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("TRABSCOR_cut")
+plot_survival_strat("TRABSCOR_cut")
 ```
 
 ## Patient's Everyday Cognition (EcogPt)
@@ -1449,50 +529,8 @@ cvalue$EcogPtDivatt <- calculate_cvalue(EcogPtDivatt)
 
 long_dat$EcogPtDivatt_cut <- ifelse(long_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtDivatt <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtDivatt_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtDivatt
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtDivatt_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtDivatt_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtDivatt_cut")
+plot_survival_strat("EcogPtDivatt_cut")
 ```
 
 ### EcogPt Everyday Language
@@ -1502,50 +540,8 @@ cvalue$EcogPtLang <- calculate_cvalue(EcogPtLang)
 
 long_dat$EcogPtLang_cut <- ifelse(long_dat$EcogPtLang > cvalue$EcogPtLang, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtLang <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtLang_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtLang
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtLang_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtLang_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtLang_cut")
+plot_survival_strat("EcogPtLang_cut")
 ```
 
 ### EcogPt Everyday Memory
@@ -1555,50 +551,8 @@ cvalue$EcogPtMem <- calculate_cvalue(EcogPtMem)
 
 long_dat$EcogPtMem_cut <- ifelse(long_dat$EcogPtMem > cvalue$EcogPtMem, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtMem <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtMem_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtMem
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtMem_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtMem_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtMem_cut")
+plot_survival_strat("EcogPtMem_cut")
 ```
 
 ### EcogPt Everyday Organization
@@ -1608,50 +562,8 @@ cvalue$EcogPtOrgan <- calculate_cvalue(EcogPtOrgan)
 
 long_dat$EcogPtOrgan_cut <- ifelse(long_dat$EcogPtOrgan > cvalue$EcogPtOrgan, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtOrgan <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtOrgan_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtOrgan
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtOrgan_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtOrgan_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtOrgan_cut")
+plot_survival_strat("EcogPtOrgan_cut")
 ```
 
 ### EcogPt Everyday Planning
@@ -1661,50 +573,8 @@ cvalue$EcogPtPlan <- calculate_cvalue(EcogPtPlan)
 
 long_dat$EcogPtPlan_cut <- ifelse(long_dat$EcogPtPlan > cvalue$EcogPtPlan, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtPlan <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtPlan_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtPlan
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtPlan_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtPlan_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtPlan_cut")
+plot_survival_strat("EcogPtPlan_cut")
 ```
 
 ### EcogPt Everyday Visuospatial Abilities
@@ -1714,50 +584,8 @@ cvalue$EcogPtVisspat <- calculate_cvalue(EcogPtVisspat)
 
 long_dat$EcogPtVisspat_cut <- ifelse(long_dat$EcogPtVisspat > cvalue$EcogPtVisspat, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtVisspat <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtVisspat_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtVisspat
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtVisspat_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtVisspat_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtVisspat_cut")
+plot_survival_strat("EcogPtVisspat_cut")
 ```
 
 ### EcogPt Total ???
@@ -1767,50 +595,8 @@ cvalue$EcogPtTotal <- calculate_cvalue(EcogPtTotal)
 
 long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogPtTotal <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogPtTotal_cut) ~ thirtile_res, data = .)
-logrank_test$EcogPtTotal
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogPtTotal_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogPtTotal_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogPtTotal_cut")
+plot_survival_strat("EcogPtTotal_cut")
 ```
 
 ## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
@@ -1822,50 +608,8 @@ cvalue$EcogSPDivatt <- calculate_cvalue(EcogSPDivatt)
 
 long_dat$EcogSPDivatt_cut <- ifelse(long_dat$EcogSPDivatt > cvalue$EcogSPDivatt, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPDivatt <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPDivatt_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPDivatt
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPDivatt_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPDivatt_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPDivatt_cut")
+plot_survival_strat("EcogSPDivatt_cut")
 ```
 
 ### EcogSP Everyday Language
@@ -1875,50 +619,8 @@ cvalue$EcogSPLang <- calculate_cvalue(EcogSPLang)
 
 long_dat$EcogSPLang_cut <- ifelse(long_dat$EcogSPLang > cvalue$EcogSPLang, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPLang <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPLang_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPLang
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPLang_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPLang_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPLang_cut")
+plot_survival_strat("EcogSPLang_cut")
 ```
 
 ### EcogSP Everyday Memory
@@ -1928,50 +630,8 @@ cvalue$EcogSPMem <- calculate_cvalue(EcogSPMem)
 
 long_dat$EcogSPMem_cut <- ifelse(long_dat$EcogSPMem > cvalue$EcogSPMem, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPMem <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPMem_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPMem
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPMem_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPMem_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPMem_cut")
+plot_survival_strat("EcogSPMem_cut")
 ```
 
 ### EcogSP Everyday Organization
@@ -1981,50 +641,8 @@ cvalue$EcogSPOrgan <- calculate_cvalue(EcogSPOrgan)
 
 long_dat$EcogSPOrgan_cut <- ifelse(long_dat$EcogSPOrgan > cvalue$EcogSPOrgan, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPOrgan <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPOrgan_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPOrgan
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPOrgan_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPOrgan_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPOrgan_cut")
+plot_survival_strat("EcogSPOrgan_cut")
 ```
 
 ### EcogSP Everyday Planning
@@ -2034,50 +652,8 @@ cvalue$EcogSPPlan <- calculate_cvalue(EcogSPPlan)
 
 long_dat$EcogSPPlan_cut <- ifelse(long_dat$EcogSPPlan > cvalue$EcogSPPlan, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPPlan <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPPlan_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPPlan
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPPlan_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPPlan_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPPlan_cut")
+plot_survival_strat("EcogSPPlan_cut")
 ```
 
 ### EcogSP Everyday Visuospatial Abilities
@@ -2087,50 +663,8 @@ cvalue$EcogSPVisspat <- calculate_cvalue(EcogSPVisspat)
 
 long_dat$EcogSPVisspat_cut <- ifelse(long_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPVisspat <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPVisspat_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPVisspat
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPVisspat_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPVisspat_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPVisspat_cut")
+plot_survival_strat("EcogSPVisspat_cut")
 ```
 
 ### EcogSP Total ???
@@ -2140,59 +674,9 @@ cvalue$EcogSPTotal <- calculate_cvalue(EcogSPTotal)
 
 long_dat$EcogSPTotal_cut <- ifelse(long_dat$EcogSPTotal > cvalue$EcogSPTotal, 1, 0)
 
-# Fit the Kaplan-Meier estimator
-surv_fit <- long_dat %>%
-  filter(as.integer(VISCODE) <= 9) %>%
-  survfit(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile_res, data = .)
-
-# Create the Kaplan-Meier survival plot
-plot(surv_fit, 
-     main = "Kaplan-Meier Survival Curve", 
-     xlab = "Time", 
-     ylab = "Survival Probability", 
-     col = c("#021636", "#bbceed", "#0a77f5"), 
-     lwd = 2,
-     xlim = c(0, 10)) 
-
-legend("bottomleft", 
-       legend = c("Underachiever", "Average", "Overachiever"), 
-       col = c("#021636", "#bbceed", "#0a77f5"), 
-       lwd = 2)
-
-axis(1, lwd = 1)  # Change x-axis thickness
-axis(2, lwd = 1)  # Change y-axis thickness
-
-# Log Rank Test 
-logrank_test$EcogSPTotal <- long_dat %>%
-  filter(thirtile_res != 2) %>%
-  survdiff(Surv(as.integer(VISCODE), EcogSPTotal_cut) ~ thirtile_res, data = .)
-logrank_test$EcogSPTotal
-
-# Histogram depicting the number of people measured at each time point by group by outcome
-ggplot(long_dat %>% filter(!is.na(EcogSPTotal_cut)), 
-       aes(x = as.integer(VISCODE), fill = factor(EcogSPTotal_cut))) +
-  geom_histogram(position = "identity", alpha = 0.6, binwidth = 2) +
-  scale_fill_manual(values = c("#bbceed", "#021636"), labels = c("Normal Cognition", "Impaired Cognition")) +
-  facet_wrap(~ thirtile_res, ncol = 3, 
-             labeller = labeller(thirtile_res = c("1" = "Underperformed", 
-                                              "2" = "Average", 
-                                              "3" = "Overperformed"))) +
-  labs(title = "Number of observations by time by group by outcome",
-       x = "Time", y = "Number of participants",
-       fill = "Legend Title") +
-  theme_minimal() +
-  theme(axis.line = element_line(size = 0.5),
-        plot.title = element_text(hjust = 0.5, face = "bold")) +
-  geom_vline(xintercept = 9, linetype = "dashed", color = "#940914")  # Add  vertical dashed line
+plot_survival("EcogSPTotal_cut")
+plot_survival_strat("EcogSPTotal_cut")
 ```
-
-```{r}
-test <- long_dat %>% filter(AGE %in% 60:70)
-
-# also test # people 65 to 75
-
-```
-
 
 ## Print session info:
 
