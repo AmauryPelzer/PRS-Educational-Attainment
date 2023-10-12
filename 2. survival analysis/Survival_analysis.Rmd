@@ -35,7 +35,6 @@ wide_dat <- read.csv("../1.\ preprocessing/output/wide_dat.csv")
 
 ## Create functions
 
-
 ```{r}
 # Calculates cut-off values using mean + 2SD of control (cognitively normal) at baseline
 calc_pos_cvalue <- function(variable) {
@@ -65,7 +64,7 @@ filter_data <- function(outcome_var){
 
 # Fits a Cox Hazards model on a data frame
 fit_coxph <- function(event, filtered_data_frame){
-  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+AGE+PTGENDER+AGE*PTGENDER, # Polygenic Risk Score EA
+  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+age+sqrt(age)+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
                  data = filtered_data_frame)
 }
 
@@ -75,7 +74,7 @@ plot_coxph <- function(coxph_model){
   pgs_df<- with(cox_filtered_dat,
   data.frame(
   thirtile_PGS = c("Low PGS","Medium PGS","High PGS"),
-  AGE = rep(mean(cox_filtered_dat$AGE), 3),
+  age = rep(mean(cox_filtered_dat$age), 3),
   PTGENDER = c("Male","Male","Male"))
   )
   
@@ -114,7 +113,6 @@ test_coxph <- function(coxph_model, outcome_var, filtered_data_frame){
 
 ```
 
-
 # Survival Analysis
 
 Using the ntile function from dplyr, the lower tertile will be assigned value 1 (\~ negative residual), middle tertile value 2 and upper tertile value 3 (\~positive residual). The time-point is limited to the 9th follow-up (i.e., 48 months).
@@ -152,7 +150,6 @@ long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 ```{r, echo=FALSE}
 
 cvalue <- list() # initialize list of cut-off values
-logrank_test <- list() # initialize list of log-rank tests
 
 long_dat$MMSE_norm <- normMMSE(long_dat$MMSE) # normalize MMSE
 
@@ -214,7 +211,7 @@ grid.arrange(box1, box2, ncol = 2)
 summary(res)
 summary(res2)
 
-rm(filtered_long_dat, box1, box2, res, res2)
+rm(filtered_long_dat, box1, box2, res, res2, wide_dat_sub)
 ```
 
 ### MMSE Survival Analysis
@@ -224,34 +221,46 @@ Next the survival analysis was conducted for the genetic capacity of educational
 ## Data Filtering
 
 ```{r}
+months <- c("bl", "m03", "m06", "m12", "m18", "m24", 
+                                    "m30","m36", "m42", "m48", "m54", "m60", 
+                                    "m66", "m72","m78", "m84", "m90", "m96", 
+                                    "m102", "m108","m114", "m120", "m126", 
+                                    "m132", "m144", "m156")
+
+time_points <- data.frame(Time = seq(0,27),
+                          Months = c(0,3,6,12,seq(from = 18, to = 156, by = 6)))
+
+################################################################################
+# Filter & Time dependent Age & Calculate tstart and tstop
+################################################################################
+
 cox_filtered_dat <- long_dat %>% # filter the data 
   filter(VISCODE <= 9, AGE >= 60, AGE <= 75) %>%
-  #select(RID, VISCODE, AGE, PTGENDER, MMSE_norm, MMSE_cut, thirtile_res, thirtile_PGS, thirtile_years) %>%
   arrange(RID, VISCODE) %>%
   mutate(GENDER = ifelse(PTGENDER== "Male", 0,1), # Calculate numerical Gender variable
-         AGExGENDER = AGE*GENDER, # Calculate interaction term manually
          VISCODE = VISCODE + 1,
          thirtile_PGS = case_when(
            thirtile_PGS == 1 ~ "Low PGS",
            thirtile_PGS == 2 ~ "Medium PGS",
            thirtile_PGS == 3 ~ "High PGS", 
-           TRUE ~ as.character(thirtile_PGS)
-           )
-         )
-
-cox_filtered_dat <- cox_filtered_dat %>%
+           TRUE ~ as.character(thirtile_PGS)),
+         age = AGE+(time_points$Months[match(.$VISCODE, time_points$Time)])/12,) %>%
+  relocate(age, .before=AGE) %>%
   group_by(RID) %>%
-  mutate(tstart = ifelse(VISCODE == 1, 0, lag(VISCODE)),
-         tstop = ifelse(VISCODE != 1, VISCODE, 1),
-         tRecovery = ifelse(lag(MMSE_cut == 1) & MMSE_cut == 0, 1, 0),
-         tRecovery = ifelse(is.na(tRecovery),0,tRecovery),
-         ntRecovery = ifelse(any(tRecovery == 1),1,0),)%>%
-  filter(ntRecovery==0) %>%
-  relocate(MMSE_cut, .before=tRecovery)
+  mutate(tstart = ifelse(VISCODE == 1,0,lag(VISCODE)),
+         tstop = ifelse(VISCODE != 1, VISCODE,1)) %>%
+  arrange(RID, VISCODE) %>%
+  relocate(c(VISCODE,tstart,tstop), .before = thirtile_res)
+
+
+################################################################################
+# Set Variables Types
+################################################################################
 
 cox_filtered_dat <- cox_filtered_dat %>%
   mutate(thirtile_PGS= as.factor(thirtile_PGS),
          AGE = as.numeric(AGE),
+         age = as.numeric(age),
          GENDER = as.factor(GENDER),
          PTGENDER = as.factor(PTGENDER)) 
 ```
@@ -276,14 +285,20 @@ print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
 
 
 ```{r}
-cox_filtered_dat$thirtile_PGS <- factor(cox_filtered_dat$thirtile_PGS, levels = c("Low PGS","Medium PGS","High PGS")) # Adjust PGS to String for clearer Interpretation
+################################################################################
+# Set Reference Level of PGS
+################################################################################
 
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS, ref="Medium PGS")) # Change the Reference Level of the PGS factor
 
 ```
 
 ```{r}
-# Creates Cox Proportional Harzards regression model
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
 res.cox <- fit_coxph("MMSE_cut", cox_filtered_dat)
 
 # Results of Models
@@ -291,12 +306,19 @@ summary(res.cox)
 
 # Plots the Cox model
 plot_coxph(res.cox)
+```
+
+## Cox Assumptions
+
+```{r}
+
 
 # Tests model assumptions
 test_coxph(res.cox, "MMSE_cut", cox_filtered_dat)
 
 # Testing Non-Linearity
-ggcoxfunctional(Surv(VISCODE, MMSE_cut) ~ AGE, data = cox_filtered_dat)
+ggcoxfunctional(Surv(VISCODE, MMSE_cut) ~ age + sqrt(age) + log(age), data = cox_filtered_dat)
+plot(residuals(res.cox))
 ```
 
 
