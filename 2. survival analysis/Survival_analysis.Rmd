@@ -87,7 +87,7 @@ plot_coxph <- function(coxph_model){
         panel.grid.major = element_line(color = "gray"),
         panel.grid.minor = element_line(color = "gray", size = 0.2)
       ),
-    title = "Survival Curve (MMSE_cut ~ PGS + AGE + GENDER + AGExGENDER)",
+    title = "Survival Curve (MMSE_cut ~ PGS + AGE + GENDER + AGExGENDER)", # Need to change title
     xlab = "Time",
     ylab = "Survival Probability",
     xlim = c(1.5, 11),
@@ -143,7 +143,7 @@ wide_dat_sub <- wide_dat[, c("RID", "thirtile_res", "res", "thirtile_years", "th
 long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 ```
 
-## Mini-Mental State Examination (MMSE)
+# Mini-Mental State Examination (MMSE)
 
 "The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org). The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated.
 
@@ -165,7 +165,7 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group
 ```
 
 
-### Boxplots of MMSE by Age Group at Baseline
+## Boxplots of MMSE by Age Group at Baseline
 
 To see if it is necessary to stratify for age groups effect of polygenic risk score for EA and age group was tested using linear regression. The results are displayed below.
 
@@ -214,7 +214,7 @@ summary(res2)
 rm(filtered_long_dat, box1, box2, res, res2, wide_dat_sub)
 ```
 
-### MMSE Survival Analysis
+# MMSE Survival Analysis
 
 Next the survival analysis was conducted for the genetic capacity of educational attainment and the residual educational attainment.
 
@@ -244,6 +244,11 @@ cox_filtered_dat <- long_dat %>% # filter the data
            thirtile_PGS == 2 ~ "Medium PGS",
            thirtile_PGS == 3 ~ "High PGS", 
            TRUE ~ as.character(thirtile_PGS)),
+         thirtile_years = case_when(
+           thirtile_years == 1 ~ "Low EA",
+           thirtile_years == 2 ~ "Medium EA",
+           thirtile_years == 3 ~ "High EA", 
+           TRUE ~ as.character(thirtile_years)),
          age = AGE+(time_points$Months[match(.$VISCODE, time_points$Time)])/12,) %>%
   relocate(age, .before=AGE) %>%
   group_by(RID) %>%
@@ -259,13 +264,14 @@ cox_filtered_dat <- long_dat %>% # filter the data
 
 cox_filtered_dat <- cox_filtered_dat %>%
   mutate(thirtile_PGS= as.factor(thirtile_PGS),
+         thirtile_years= as.factor(thirtile_years),
          AGE = as.numeric(AGE),
          age = as.numeric(age),
          GENDER = as.factor(GENDER),
          PTGENDER = as.factor(PTGENDER)) 
 ```
 
-# Descriptive Statistics
+## Descriptive Statistics
 
 ```{r}
 length(unique(long_dat$RID)) # Number of individuals overall
@@ -286,10 +292,13 @@ print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
 
 ```{r}
 ################################################################################
-# Set Reference Level of PGS
+# Set Reference Level of PGS & Years
 ################################################################################
 
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS, ref="Medium PGS")) # Change the Reference Level of the PGS factor
+
+cox_filtered_dat <- within(cox_filtered_dat,thirtile_years <- relevel(thirtile_years, ref="Medium EA")) # Change the Reference Level of the EA factor
+
 
 ```
 
@@ -311,8 +320,6 @@ plot_coxph(res.cox)
 ## Cox Assumptions
 
 ```{r}
-
-
 # Tests model assumptions
 test_coxph(res.cox, "MMSE_cut", cox_filtered_dat)
 
@@ -340,8 +347,14 @@ cvalue$ADAS11 <- calc_pos_cvalue(ADAS11)
 cox_filtered_dat$ADAS11_cut <- ifelse(cox_filtered_dat$ADAS11 > cvalue$ADAS11, 1, 0)
 
 cox_filtered_dat <- filter_data(ADAS11_cut)
+```
 
-# Creates Cox Proportional Harzards regression model
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
 res.cox <- fit_coxph("ADAS11_cut", cox_filtered_dat)
 
 # Results of Models
@@ -349,17 +362,24 @@ summary(res.cox)
 
 # Plots the Cox model
 plot_coxph(res.cox)
+```
 
+#### Cox Assumptions
+
+```{r}
 # Tests model assumptions
 test_coxph(res.cox, "ADAS11_cut", cox_filtered_dat)
 
 # Testing Non-Linearity
-ggcoxfunctional(Surv(VISCODE, ADAS11_cut) ~ AGE, data = cox_filtered_dat)
+ggcoxfunctional(Surv(VISCODE, ADAS11_cut) ~ age + sqrt(age) + log(age), data = cox_filtered_dat)
+plot(residuals(res.cox))
 ```
+
 
 ### ADAS13
 
 "The ADAS13 was included as a global measure of cognitive function. ADAS13 is a test battery developed to assess severity of cognitive impairment associated with AD and includes subtests and clinical evaluations assessing memory function, reasoning, language function, orientation and praxis. The ADAS13 is a modified version of the original ADAS-Cog-11, adding a cancellation task and a delayed free recall task. The higher the scores, the more severe impairment of cognitive function." (Mofrad et al., 2021)
+
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$ADAS13 <- calc_pos_cvalue(ADAS13)
@@ -367,8 +387,14 @@ cvalue$ADAS13 <- calc_pos_cvalue(ADAS13)
 cox_filtered_dat$ADAS13_cut <- ifelse(cox_filtered_dat$ADAS13 > cvalue$ADAS13, 1, 0)
 
 cox_filtered_dat <- filter_data(ADAS13_cut)
+```
 
-# Creates Cox Proportional Harzards regression model
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
 res.cox <- fit_coxph("ADAS13_cut", cox_filtered_dat)
 
 # Results of Models
@@ -376,23 +402,54 @@ summary(res.cox)
 
 # Plots the Cox model
 plot_coxph(res.cox)
+```
 
+#### Cox Assumptions
+
+```{r}
 # Tests model assumptions
 test_coxph(res.cox, "ADAS13_cut", cox_filtered_dat)
 
 # Testing Non-Linearity
-ggcoxfunctional(Surv(VISCODE, ADAS13_cut) ~ AGE, data = cox_filtered_dat)
+ggcoxfunctional(Surv(VISCODE, ADAS13_cut) ~ age + sqrt(age) + log(age), data = cox_filtered_dat)
+plot(residuals(res.cox))
 ```
 
 ### ADASQ4
 
+
 ```{r, echo=FALSE, message=FALSE}
-cvalue$ADASQ4 <- calculate_cvalue(ADASQ4)
+cvalue$ADASQ4 <- calc_pos_cvalue(ADASQ4)
 
-long_dat$ADASQ4_cut <- ifelse(long_dat$ADASQ4 > cvalue$ADASQ4, 1, 0)
+cox_filtered_dat$ADASQ4_cut <- ifelse(cox_filtered_dat$ADASQ4 > cvalue$ADASQ4, 1, 0)
 
-plot_survival("ADAS11_cut")
-plot_survival_strat("ADAS11_cut")
+cox_filtered_dat <- filter_data(ADASQ4_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox <- fit_coxph("ADASQ4_cut", cox_filtered_dat)
+
+# Results of Models
+summary(res.cox)
+
+# Plots the Cox model
+plot_coxph(res.cox)
+```
+
+#### Cox Assumptions
+
+```{r}
+# Tests model assumptions
+test_coxph(res.cox, "ADASQ4_cut", cox_filtered_dat)
+
+# Testing Non-Linearity
+ggcoxfunctional(Surv(VISCODE, ADASQ4_cut) ~ age + sqrt(age) + log(age), data = cox_filtered_dat)
+plot(residuals(res.cox))
 ```
 
 ## CDRSB
