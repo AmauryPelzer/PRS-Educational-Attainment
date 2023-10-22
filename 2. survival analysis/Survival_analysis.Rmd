@@ -63,14 +63,19 @@ filter_data <- function(outcome_var){
 
 
 # Fits a Cox Hazards model on a data frame
-fit_coxph <- function(event, filtered_data_frame){
+fit_coxph_PGS <- function(event, filtered_data_frame=cox_filtered_dat){
   coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+age+sqrt(age)+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
+                 data = filtered_data_frame)
+}
+
+fit_coxph_years <- function(event, filtered_data_frame=cox_filtered_dat){
+  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_years+age+sqrt(age)+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
                  data = filtered_data_frame)
 }
 
 
 # Plots the survival curve of a Cox Hazards model
-plot_coxph <- function(coxph_model){
+plot_coxph_PGS <- function(coxph_model){
   pgs_df<- with(cox_filtered_dat,
   data.frame(
   thirtile_PGS = c("Low PGS","Medium PGS","High PGS"),
@@ -96,9 +101,36 @@ plot_coxph <- function(coxph_model){
   )
 }
 
+# Plots the survival curve of a Cox Hazards model
+plot_coxph_years <- function(coxph_model){
+  pgs_df<- with(cox_filtered_dat,
+  data.frame(
+  thirtile_years = c("Low EA","Medium EA","High EA"),
+  age = rep(mean(cox_filtered_dat$age), 3),
+  PTGENDER = c("Male","Male","Male"))
+  )
+  
+  ggsurvplot(
+    survfit(coxph_model, newdata = pgs_df),
+    data = cox_filtered_dat,
+    legend.labs = c("Low EA","Medium EA","High EA"),
+    ggtheme = theme_minimal() +
+      theme(
+        panel.grid.major = element_line(color = "gray"),
+        panel.grid.minor = element_line(color = "gray", size = 0.2)
+      ),
+    title = "Survival Curve (MMSE_cut ~ years + AGE + GENDER + AGExGENDER)", # Need to change title
+    xlab = "Time",
+    ylab = "Survival Probability",
+    xlim = c(1.5, 11),
+    palette = c("#021636", "#bbceed", "#0a77f5"),
+    conf.int = FALSE  # Show confidence intervals
+  )
+}
+
 
 # Tests model assumption for the model
-test_coxph <- function(coxph_model, outcome_var, filtered_data_frame){
+test_coxph <- function(coxph_model){
   # Testing Proportional Hazards
   test.ph <- cox.zph(coxph_model)
   test.ph
@@ -308,24 +340,27 @@ cox_filtered_dat <- within(cox_filtered_dat,thirtile_years <- relevel(thirtile_y
 ################################################################################
 
 # Creates Cox Proportional Hazards regression model
-res.cox <- fit_coxph("MMSE_cut", cox_filtered_dat)
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
 
 # Results of Models
-summary(res.cox)
+summary(res.cox.PGS)
+summary(res.cox.years)
 
 # Plots the Cox model
-plot_coxph(res.cox)
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## Cox Assumptions
 
 ```{r}
 # Tests model assumptions
-test_coxph(res.cox, "MMSE_cut", cox_filtered_dat)
+test_coxph(res.cox.PGS)
 
 # Testing Non-Linearity
 ggcoxfunctional(Surv(VISCODE, MMSE_cut) ~ age + sqrt(age) + log(age), data = cox_filtered_dat)
-plot(residuals(res.cox))
+plot(residuals(res.cox.PGS))
 ```
 
 
@@ -355,13 +390,16 @@ cox_filtered_dat <- filter_data(ADAS11_cut)
 ################################################################################
 
 # Creates Cox Proportional Hazards regression model
-res.cox <- fit_coxph("ADAS11_cut", cox_filtered_dat)
+res.cox.PGS <- fit_coxph_PGS("ADAS11_cut")
+res.cox.years <- fit_coxph_years("ADAS11_cut")
 
 # Results of Models
-summary(res.cox)
+summary(res.cox.PGS)
+summary(res.cox.years)
 
 # Plots the Cox model
-plot_coxph(res.cox)
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 #### Cox Assumptions
@@ -395,13 +433,16 @@ cox_filtered_dat <- filter_data(ADAS13_cut)
 ################################################################################
 
 # Creates Cox Proportional Hazards regression model
-res.cox <- fit_coxph("ADAS13_cut", cox_filtered_dat)
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
 
 # Results of Models
-summary(res.cox)
+summary(res.cox.PGS)
+summary(res.cox.years)
 
 # Plots the Cox model
-plot_coxph(res.cox)
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 #### Cox Assumptions
@@ -432,13 +473,16 @@ cox_filtered_dat <- filter_data(ADASQ4_cut)
 ################################################################################
 
 # Creates Cox Proportional Hazards regression model
-res.cox <- fit_coxph("ADASQ4_cut", cox_filtered_dat)
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
 
 # Results of Models
-summary(res.cox)
+summary(res.cox.PGS)
+summary(res.cox.years)
 
 # Plots the Cox model
-plot_coxph(res.cox)
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 #### Cox Assumptions
@@ -461,10 +505,27 @@ See [Table 3](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3409562/table/T3/?rep
 ```{r, echo=FALSE, message=FALSE}
 cvalue$CDRSB <- calculate_cvalue(CDRSB)
 
-long_dat$CDRSB_cut <- ifelse(long_dat$CDRSB > cvalue$CDRSB, 1, 0)
+cox_filtered_dat$CDRSB_cut <- ifelse(cox_filtered_dat$CDRSB > cvalue$CDRSB, 1, 0)
 
-plot_survival("CDRSB_cut")
-plot_survival_strat("CDRSB_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## DIGITSCORE
@@ -479,10 +540,27 @@ cvalue$DIGITSCOR <- wide_dat %>%
     ) %>%
     pull(value)
 
-long_dat$DIGITSCOR_cut <- ifelse(long_dat$DIGITSCOR < cvalue$DIGITSCOR, 1, 0)
+cox_filtered_dat$DIGITSCOR_cut <- ifelse(cox_filtered_dat$DIGITSCOR < cvalue$DIGITSCOR, 1, 0)
 
-plot_survival("DIGITSCOR_cut")
-plot_survival_strat("DIGITSCOR_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## FAQ
@@ -492,10 +570,27 @@ The Functional Activities Questionnaire is used to assess an individual's functi
 ```{r, echo=FALSE, message=FALSE}
 cvalue$FAQ <- 5
 
-long_dat$FAQ_cut <- ifelse(long_dat$FAQ > cvalue$FAQ, 1, 0)
+cox_filtered_dat$FAQ_cut <- ifelse(cox_filtered_dat$FAQ > cvalue$FAQ, 1, 0)
 
-plot_survival("FAQ_cut")
-plot_survival_strat("FAQ_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## LDELTOTAL
@@ -508,10 +603,27 @@ cvalue$LDELTOTAL <- wide_dat %>%
     ) %>%
     pull(value)
 
-long_dat$LDELTOTAL_cut <- ifelse(long_dat$LDELTOTAL < cvalue$LDELTOTAL, 1, 0)
+cox_filtered_dat$LDELTOTAL_cut <- ifelse(cox_filtered_dat$LDELTOTAL < cvalue$LDELTOTAL, 1, 0)
 
-plot_survival("LDELTOTAL_cut")
-plot_survival_strat("LDELTOTAL_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## MOCA
@@ -519,10 +631,27 @@ plot_survival_strat("LDELTOTAL_cut")
 Reference literature: doi: 10.1111/j.1532-5415.2005.53221.x
 
 ```{r, echo=FALSE, message=FALSE}
-long_dat$MOCA_cut <- ifelse(long_dat$MOCA < 26, 1, 0)
+cox_filtered_dat$MOCA_cut <- ifelse(cox_filtered_dat$MOCA < 26, 1, 0)
 
-plot_survival("MOCA_cut")
-plot_survival_strat("MOCA_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## Rey-Auditory Verbal Learning Test (RAVLT)
@@ -541,10 +670,27 @@ cvalue$RAVLT_immediate <- wide_dat %>%
     ) %>%
     pull(value)
 
-long_dat$RAVLT_immediate_cut <- ifelse(long_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
+cox_filtered_dat$RAVLT_immediate_cut <- ifelse(cox_filtered_dat$RAVLT_immediate > cvalue$RAVLT_immediate, 1, 0)
 
-plot_survival("RAVLT_immediate_cut")
-plot_survival_strat("RAVLT_immediate_cut")
+cox_filtered_dat <- filter_data(RAVLT_immediate_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("RAVLT_immediate_cut")
+res.cox.years <- fit_coxph_years("RAVLT_immediate_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### RAVLT Percentage Forgetting
@@ -552,10 +698,27 @@ plot_survival_strat("RAVLT_immediate_cut")
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_perc_forgetting <- calculate_cvalue(RAVLT_perc_forgetting)
 
-long_dat$RAVLT_perc_forgetting_cut <- ifelse(long_dat$RAVLT_perc_forgetting > cvalue$RAVLT_perc_forgetting, 1, 0)
+cox_filtered_dat$RAVLT_perc_forgetting_cut <- ifelse(cox_filtered_dat$RAVLT_perc_forgetting > cvalue$RAVLT_perc_forgetting, 1, 0)
 
-plot_survival("RAVLT_perc_forgetting_cut")
-plot_survival_strat("RAVLT_perc_forgetting_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### RAVLT Forgetting
@@ -563,10 +726,27 @@ plot_survival_strat("RAVLT_perc_forgetting_cut")
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_forgetting <- calculate_cvalue(RAVLT_forgetting)
 
-long_dat$RAVLT_forgetting_cut <- ifelse(long_dat$RAVLT_forgetting > cvalue$RAVLT_forgetting, 1, 0)
+cox_filtered_dat$RAVLT_forgetting_cut <- ifelse(cox_filtered_dat$RAVLT_forgetting > cvalue$RAVLT_forgetting, 1, 0)
 
-plot_survival("RAVLT_forgetting_cut")
-plot_survival_strat("RAVLT_forgetting_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### RAVLT Learning
@@ -574,10 +754,27 @@ plot_survival_strat("RAVLT_forgetting_cut")
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_learning <- calculate_cvalue(RAVLT_learning)
 
-long_dat$RAVLT_learning_cut <- ifelse(long_dat$RAVLT_learning > cvalue$RAVLT_learning, 1, 0)
+cox_filtered_dat$RAVLT_learning_cut <- ifelse(cox_filtered_dat$RAVLT_learning > cvalue$RAVLT_learning, 1, 0)
 
-plot_survival("RAVLT_learning_cut")
-plot_survival_strat("RAVLT_learning_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## TRABSCORE
@@ -591,10 +788,27 @@ Record the total number of seconds to complete Part B (*Trails B*), up to a maxi
 ```{r, echo=FALSE, message=FALSE}
 cvalue$TRABSCOR <- calculate_cvalue(TRABSCOR)
 
-long_dat$TRABSCOR_cut <- ifelse(long_dat$TRABSCOR > cvalue$TRABSCOR, 1, 0)
+cox_filtered_dat$TRABSCOR_cut <- ifelse(cox_filtered_dat$TRABSCOR > cvalue$TRABSCOR, 1, 0)
 
-plot_survival("TRABSCOR_cut")
-plot_survival_strat("TRABSCOR_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## Patient's Everyday Cognition (EcogPt)
@@ -606,10 +820,27 @@ The original version of the ECog is an informant-based measure of cognitively-re
 ```{r, echo=FALSE, message=FALSE}
 cvalue$EcogPtDivatt <- calculate_cvalue(EcogPtDivatt)
 
-long_dat$EcogPtDivatt_cut <- ifelse(long_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
+cox_filtered_dat$EcogPtDivatt_cut <- ifelse(cox_filtered_dat$EcogPtDivatt > cvalue$EcogPtDivatt, 1, 0)
 
-plot_survival("EcogPtDivatt_cut")
-plot_survival_strat("EcogPtDivatt_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogPt Everyday Language
@@ -617,10 +848,27 @@ plot_survival_strat("EcogPtDivatt_cut")
 ```{r, echo=FALSE}
 cvalue$EcogPtLang <- calculate_cvalue(EcogPtLang)
 
-long_dat$EcogPtLang_cut <- ifelse(long_dat$EcogPtLang > cvalue$EcogPtLang, 1, 0)
+cox_filtered_dat$EcogPtLang_cut <- ifelse(cox_filtered_dat$EcogPtLang > cvalue$EcogPtLang, 1, 0)
 
-plot_survival("EcogPtLang_cut")
-plot_survival_strat("EcogPtLang_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogPt Everyday Memory
@@ -628,10 +876,27 @@ plot_survival_strat("EcogPtLang_cut")
 ```{r, echo=FALSE}
 cvalue$EcogPtMem <- calculate_cvalue(EcogPtMem)
 
-long_dat$EcogPtMem_cut <- ifelse(long_dat$EcogPtMem > cvalue$EcogPtMem, 1, 0)
+cox_filtered_dat$EcogPtMem_cut <- ifelse(cox_filtered_dat$EcogPtMem > cvalue$EcogPtMem, 1, 0)
 
-plot_survival("EcogPtMem_cut")
-plot_survival_strat("EcogPtMem_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogPt Everyday Organization
@@ -639,10 +904,27 @@ plot_survival_strat("EcogPtMem_cut")
 ```{r, echo=FALSE}
 cvalue$EcogPtOrgan <- calculate_cvalue(EcogPtOrgan)
 
-long_dat$EcogPtOrgan_cut <- ifelse(long_dat$EcogPtOrgan > cvalue$EcogPtOrgan, 1, 0)
+cox_filtered_dat$EcogPtOrgan_cut <- ifelse(cox_filtered_dat$EcogPtOrgan > cvalue$EcogPtOrgan, 1, 0)
 
-plot_survival("EcogPtOrgan_cut")
-plot_survival_strat("EcogPtOrgan_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogPt Everyday Planning
@@ -650,10 +932,27 @@ plot_survival_strat("EcogPtOrgan_cut")
 ```{r, echo=FALSE}
 cvalue$EcogPtPlan <- calculate_cvalue(EcogPtPlan)
 
-long_dat$EcogPtPlan_cut <- ifelse(long_dat$EcogPtPlan > cvalue$EcogPtPlan, 1, 0)
+cox_filtered_dat$EcogPtPlan_cut <- ifelse(cox_filtered_dat$EcogPtPlan > cvalue$EcogPtPlan, 1, 0)
 
-plot_survival("EcogPtPlan_cut")
-plot_survival_strat("EcogPtPlan_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogPt Everyday Visuospatial Abilities
@@ -661,21 +960,55 @@ plot_survival_strat("EcogPtPlan_cut")
 ```{r, echo=FALSE}
 cvalue$EcogPtVisspat <- calculate_cvalue(EcogPtVisspat)
 
-long_dat$EcogPtVisspat_cut <- ifelse(long_dat$EcogPtVisspat > cvalue$EcogPtVisspat, 1, 0)
+cox_filtered_dat$EcogPtVisspat_cut <- ifelse(cox_filtered_dat$EcogPtVisspat > cvalue$EcogPtVisspat, 1, 0)
 
-plot_survival("EcogPtVisspat_cut")
-plot_survival_strat("EcogPtVisspat_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
 ```
 
-### EcogPt Total ???
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
+```
+
+### EcogPt Total
 
 ```{r, echo=FALSE}
 cvalue$EcogPtTotal <- calculate_cvalue(EcogPtTotal)
 
-long_dat$EcogPtTotal_cut <- ifelse(long_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
+cox_filtered_dat$EcogPtTotal_cut <- ifelse(cox_filtered_dat$EcogPtTotal > cvalue$EcogPtTotal, 1, 0)
 
-plot_survival("EcogPtTotal_cut")
-plot_survival_strat("EcogPtTotal_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
@@ -685,10 +1018,27 @@ plot_survival_strat("EcogPtTotal_cut")
 ```{r, echo=FALSE}
 cvalue$EcogSPDivatt <- calculate_cvalue(EcogSPDivatt)
 
-long_dat$EcogSPDivatt_cut <- ifelse(long_dat$EcogSPDivatt > cvalue$EcogSPDivatt, 1, 0)
+cox_filtered_dat$EcogSPDivatt_cut <- ifelse(cox_filtered_dat$EcogSPDivatt > cvalue$EcogSPDivatt, 1, 0)
 
-plot_survival("EcogSPDivatt_cut")
-plot_survival_strat("EcogSPDivatt_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogSP Everyday Language
@@ -696,10 +1046,27 @@ plot_survival_strat("EcogSPDivatt_cut")
 ```{r, echo=FALSE}
 cvalue$EcogSPLang <- calculate_cvalue(EcogSPLang)
 
-long_dat$EcogSPLang_cut <- ifelse(long_dat$EcogSPLang > cvalue$EcogSPLang, 1, 0)
+cox_filtered_dat$EcogSPLang_cut <- ifelse(cox_filtered_dat$EcogSPLang > cvalue$EcogSPLang, 1, 0)
 
-plot_survival("EcogSPLang_cut")
-plot_survival_strat("EcogSPLang_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogSP Everyday Memory
@@ -707,10 +1074,27 @@ plot_survival_strat("EcogSPLang_cut")
 ```{r, echo=FALSE}
 cvalue$EcogSPMem <- calculate_cvalue(EcogSPMem)
 
-long_dat$EcogSPMem_cut <- ifelse(long_dat$EcogSPMem > cvalue$EcogSPMem, 1, 0)
+cox_filtered_dat$EcogSPMem_cut <- ifelse(cox_filtered_dat$EcogSPMem > cvalue$EcogSPMem, 1, 0)
 
-plot_survival("EcogSPMem_cut")
-plot_survival_strat("EcogSPMem_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogSP Everyday Organization
@@ -718,10 +1102,27 @@ plot_survival_strat("EcogSPMem_cut")
 ```{r, echo=FALSE}
 cvalue$EcogSPOrgan <- calculate_cvalue(EcogSPOrgan)
 
-long_dat$EcogSPOrgan_cut <- ifelse(long_dat$EcogSPOrgan > cvalue$EcogSPOrgan, 1, 0)
+cox_filtered_dat$EcogSPOrgan_cut <- ifelse(cox_filtered_dat$EcogSPOrgan > cvalue$EcogSPOrgan, 1, 0)
 
-plot_survival("EcogSPOrgan_cut")
-plot_survival_strat("EcogSPOrgan_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogSP Everyday Planning
@@ -729,10 +1130,27 @@ plot_survival_strat("EcogSPOrgan_cut")
 ```{r, echo=FALSE}
 cvalue$EcogSPPlan <- calculate_cvalue(EcogSPPlan)
 
-long_dat$EcogSPPlan_cut <- ifelse(long_dat$EcogSPPlan > cvalue$EcogSPPlan, 1, 0)
+cox_filtered_dat$EcogSPPlan_cut <- ifelse(cox_filtered_dat$EcogSPPlan > cvalue$EcogSPPlan, 1, 0)
 
-plot_survival("EcogSPPlan_cut")
-plot_survival_strat("EcogSPPlan_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogSP Everyday Visuospatial Abilities
@@ -740,10 +1158,27 @@ plot_survival_strat("EcogSPPlan_cut")
 ```{r, echo=FALSE, message=FALSE}
 cvalue$EcogSPVisspat <- calculate_cvalue(EcogSPVisspat)
 
-long_dat$EcogSPVisspat_cut <- ifelse(long_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
+cox_filtered_dat$EcogSPVisspat_cut <- ifelse(cox_filtered_dat$EcogSPVisspat > cvalue$EcogSPVisspat, 1, 0)
 
-plot_survival("EcogSPVisspat_cut")
-plot_survival_strat("EcogSPVisspat_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ### EcogSP Total ???
@@ -751,10 +1186,27 @@ plot_survival_strat("EcogSPVisspat_cut")
 ```{r, echo=FALSE}
 cvalue$EcogSPTotal <- calculate_cvalue(EcogSPTotal)
 
-long_dat$EcogSPTotal_cut <- ifelse(long_dat$EcogSPTotal > cvalue$EcogSPTotal, 1, 0)
+cox_filtered_dat$EcogSPTotal_cut <- ifelse(cox_filtered_dat$EcogSPTotal > cvalue$EcogSPTotal, 1, 0)
 
-plot_survival("EcogSPTotal_cut")
-plot_survival_strat("EcogSPTotal_cut")
+cox_filtered_dat <- filter_data(ADAS13_cut)
+```
+
+```{r}
+################################################################################
+# Run Cox Proportional Hazards Model & Plot
+################################################################################
+
+# Creates Cox Proportional Hazards regression model
+res.cox.PGS <- fit_coxph_PGS("MMSE_cut")
+res.cox.years <- fit_coxph_years("MMSE_cut")
+
+# Results of Models
+summary(res.cox.PGS)
+summary(res.cox.years)
+
+# Plots the Cox model
+plot_coxph_PGS(res.cox.PGS)
+plot_coxph_years(res.cox.years)
 ```
 
 ## Print session info:
