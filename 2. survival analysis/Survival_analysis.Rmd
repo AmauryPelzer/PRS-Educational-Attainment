@@ -78,19 +78,19 @@ filter_data <- function(outcome_var){
     mutate(tRecovery = ifelse(lag({{outcome_var}} == 1) & {{outcome_var}} == 0, 1, 0),
            tRecovery = ifelse(is.na(tRecovery),0,tRecovery),
            ntRecovery = ifelse(any(tRecovery == 1),1,0),)%>%
-    filter(ntRecovery==0) %>%
+    #filter(ntRecovery==0) %>%
     relocate({{outcome_var}}, .before=tRecovery)
 }
 
 # Fits a Cox Hazards model on a data frame using thirtile PGS as a main predictor
 fit_coxph_PGS <- function(event, filtered_data_frame=cox_filtered_dat){
-  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+age+sqrt(age)+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
+  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+age+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
                  data = filtered_data_frame)
 }
 
 # Fits a Cox Hazards model on a data frame using thirtile years as a main predictor
 fit_coxph_years <- function(event, filtered_data_frame=cox_filtered_dat){
-  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_years+age+sqrt(age)+PTGENDER+age*PTGENDER, # Years in education
+  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_years+age+PTGENDER+age*PTGENDER, # Years in education
                  data = filtered_data_frame)
 }
 
@@ -772,7 +772,7 @@ cox_filtered_dat$RAVLT_learning_cut <- ifelse(cox_filtered_dat$RAVLT_learning > 
 cox_filtered_dat <- filter_data(RAVLT_learning_cut)
 ```
 
-```{r, eval=FALSE}
+```{r, echo=FALSE}
 ################################################################################
 # Run Cox Proportional Hazards Model & Plot
 ################################################################################
