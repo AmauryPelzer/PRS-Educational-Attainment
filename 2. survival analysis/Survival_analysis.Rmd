@@ -12,6 +12,7 @@ if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); lib
 if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
 if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
 if (suppressWarnings(!require(survminer))) {install.packages("survminer"); library(survminer)}
+if (suppressWarnings(!require(lme4))) {install.packages("lme4"); library(lme4)}
 #if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
 #if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
 #if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
@@ -1220,6 +1221,20 @@ summary(res.cox.years)
 # Plots the Cox model
 plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
+```
+
+# Multi-Level Regression Model
+
+```{r}
+cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS, ref="Low PGS")) # Change the Reference Level of the PGS factor
+cox_filtered_dat <- within(cox_filtered_dat,thirtile_years <- relevel(thirtile_years, ref="Low EA")) # Change the Reference Level of the PGS factor
+
+mlr_pgs_adas11 <- lmer(ADAS11 ~ thirtile_PGS + age + PTGENDER + age*PTGENDER + (1 | RID), data=cox_filtered_dat) # Multi-Level Model for PGS
+mlr_years_adas11 <- lmer(ADAS11 ~ thirtile_years + age + PTGENDER + age*PTGENDER + (1 | RID), data=cox_filtered_dat) # Multi-Level Model for Years
+
+mlr_models <- list(mlr_pgs_adas11,mlr_years_adas11)
+
+lapply(mlr_models, summary)
 ```
 
 # Print session info:
