@@ -6,20 +6,19 @@ output: rmdformats::robobook
 
 ```{r, include=FALSE}
 if (suppressWarnings(!require(dplyr))) {install.packages("dplyr"); library(dplyr)}
-#if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
-#if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
-#if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
-#if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
-if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
-#if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
-#if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
-#if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
 if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
 if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
 if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
-#if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
+if (suppressWarnings(!require(ggplot2))) {install.packages("ggplot2"); library(ggplot2)}
+if (suppressWarnings(!require(survival))) {install.packages("survival"); library(survival)}
 if (suppressWarnings(!require(survminer))) {install.packages("survminer"); library(survminer)}
-
+#if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(tidyverse)}
+#if (suppressWarnings(!require(data.table))) {install.packages("data.table"); library(data.table)}
+#if (suppressWarnings(!require(formattable))) {install.packages("formattable"); library(formattable)}
+#if (suppressWarnings(!require(ggsurvfit))) {install.packages("ggsurvfit"); library(ggsurvfit)}
+#if (suppressWarnings(!require(performance))) {install.packages("performance"); library(performance)}
+#if (suppressWarnings(!require(cowplot))) {install.packages("cowplot"); library(cowplot)}
+#if (suppressWarnings(!require(nlme))) {install.packages("nlme"); library(nlme)}
 ```
 
 # Import Data and create functions
@@ -35,7 +34,15 @@ wide_dat <- read.csv("../1.\ preprocessing/output/wide_dat.csv")
 
 ## Create functions
 
-```{r}
+Here, we create functions for:
+
+  * Calculating cut-off values using either mean + 2SD or mean - 2SD
+  * Calculating whether individuals recover from a drop in a test
+  * Fit a cox regression based on thirtile_years or thirtile_PGS
+  * Plot the survival curve for the cox regression
+  * Test model assumptions for the cox regression
+
+```{r, echo=FALSE}
 # Calculates cut-off values using mean + 2SD of control (cognitively normal) at baseline
 calc_pos_cvalue <- function(variable) {
   var_bl <- paste0(deparse(substitute(variable)), "_0")
@@ -50,6 +57,7 @@ calc_pos_cvalue <- function(variable) {
   return(value)
 }
 
+# Calculates cut-off values using mean - 2SD of control (cognitively normal) at baseline
 calc_neg_cvalue <- function(variable) {
   var_bl <- paste0(deparse(substitute(variable)), "_0")
   
@@ -63,7 +71,7 @@ calc_neg_cvalue <- function(variable) {
   return(value)
 }
 
-
+# Calculates the time dependent and independent recovery for each participant (do they recover from a drop in a cognitive test)
 filter_data <- function(outcome_var){
   cox_filtered_dat <- cox_filtered_dat %>%
     group_by(RID) %>%
@@ -74,20 +82,19 @@ filter_data <- function(outcome_var){
     relocate({{outcome_var}}, .before=tRecovery)
 }
 
-
-# Fits a Cox Hazards model on a data frame
+# Fits a Cox Hazards model on a data frame using thirtile PGS as a main predictor
 fit_coxph_PGS <- function(event, filtered_data_frame=cox_filtered_dat){
   coxph(Surv(tstart, tstop, get(event)) ~ thirtile_PGS+age+sqrt(age)+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
                  data = filtered_data_frame)
 }
 
+# Fits a Cox Hazards model on a data frame using thirtile years as a main predictor
 fit_coxph_years <- function(event, filtered_data_frame=cox_filtered_dat){
-  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_years+age+sqrt(age)+PTGENDER+age*PTGENDER, # Polygenic Risk Score EA
+  coxph(Surv(tstart, tstop, get(event)) ~ thirtile_years+age+sqrt(age)+PTGENDER+age*PTGENDER, # Years in education
                  data = filtered_data_frame)
 }
 
-
-# Plots the survival curve of a Cox Hazards model
+# Plots the survival curve of a Cox Hazards model for the PGS model
 plot_coxph_PGS <- function(coxph_model){
   pgs_df<- with(cox_filtered_dat,
   data.frame(
@@ -114,7 +121,7 @@ plot_coxph_PGS <- function(coxph_model){
   )
 }
 
-# Plots the survival curve of a Cox Hazards model
+# Plots the survival curve of a Cox Hazards model for the years model
 plot_coxph_years <- function(coxph_model){
   pgs_df<- with(cox_filtered_dat,
   data.frame(
@@ -141,7 +148,6 @@ plot_coxph_years <- function(coxph_model){
   )
 }
 
-
 # Tests model assumption for the model
 test_coxph <- function(coxph_model){
   # Testing Proportional Hazards
@@ -155,7 +161,6 @@ test_coxph <- function(coxph_model){
                    linear.predictions = FALSE,
                    ggtheme=theme_bw())
 }
-
 ```
 
 # Survival Analysis
@@ -193,7 +198,6 @@ long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 "The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org). The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated.
 
 ```{r, echo=FALSE}
-
 cvalue <- list() # initialize list of cut-off values
 
 long_dat$MMSE_norm <- normMMSE(long_dat$MMSE) # normalize MMSE
@@ -214,7 +218,7 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group
 
 To see if it is necessary to stratify for age groups effect of polygenic risk score for EA and age group was tested using linear regression. The results are displayed below.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 filtered_long_dat <- long_dat %>% #filter out NA cases (== AGE is not between 60-75)
   filter(!is.na(Age_Group), VISCODE==0)
 
@@ -261,11 +265,13 @@ rm(filtered_long_dat, box1, box2, res, res2, wide_dat_sub)
 
 # MMSE Survival Analysis
 
-Next the survival analysis was conducted for the genetic capacity of educational attainment and the residual educational attainment.
+Next the survival analysis was conducted for the genetic capacity of educational attainment and the years of actual educational attainment.
 
 ## Data Filtering
 
-```{r}
+We created "age" as a time-dependent variable as well as "tstart" and "tstop".
+
+```{r, echo=FALSE}
 months <- c("bl", "m03", "m06", "m12", "m18", "m24", 
                                     "m30","m36", "m42", "m48", "m54", "m60", 
                                     "m66", "m72","m78", "m84", "m90", "m96", 
@@ -318,7 +324,14 @@ cox_filtered_dat <- cox_filtered_dat %>%
 
 ## Descriptive Statistics
 
-```{r}
+The following output shows:
+
+  1. the number of individuals overall
+  2. the number of unique individuals in the analysis
+  3. the number of males/females in the analysis
+  4. the number of individuals per time-point
+
+```{r, echo=FALSE}
 length(unique(long_dat$RID)) # Number of individuals overall
 
 length(unique(cox_filtered_dat$RID)) # Number of unique individuals in the analysis
@@ -333,9 +346,11 @@ print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
   group_by(VISCODE) %>%
   summarize(Count = n()))
 ```
+From now on, the reference for the regression model is:
+  * "Medium PGS" for thirtile_PGS
+  * "Medium EA" for thirtile_years
 
-
-```{r}
+```{r, echo=FALSE}
 ################################################################################
 # Set Reference Level of PGS & Years
 ################################################################################
@@ -343,11 +358,11 @@ print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS, ref="Medium PGS")) # Change the Reference Level of the PGS factor
 
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_years <- relevel(thirtile_years, ref="Medium EA")) # Change the Reference Level of the EA factor
-
-
 ```
 
-```{r, echo=FALSE, message=FALSE}
+Here is the output for the Cox Proportional Hazards model of MMSE
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 ################################################################################
 # Run Cox Proportional Hazards Model & Plot
 ################################################################################
@@ -367,7 +382,7 @@ plot_coxph_years(res.cox.years)
 
 ## Cox Assumptions
 
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Tests model assumptions
 test_coxph(res.cox.PGS)
 
@@ -377,7 +392,7 @@ plot(residuals(res.cox.PGS))
 ```
 
 
-## Alzheimer's Disease Assessment Scale
+# Alzheimer's Disease Assessment Scale
 
 The Cognitive Subscale Alzheimer's Disease Assessment Scale (ADAS) is made of 11 tasks that include both subject-completed tests and observer-based assessments, assessing the memory, language, and praxis domains. The result is a global final score ranging from 0 to 70, based on the sum of the scores of the single tasks (ADAS11).
 
@@ -387,7 +402,7 @@ In addition, the score of the task 4 (Word Recognition, ADASQ4) was included in 
 
 ([Grassi et al., 2019](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6646724/))
 
-### ADAS11
+## ADAS11
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$ADAS11 <- calc_pos_cvalue(ADAS11)
@@ -415,9 +430,9 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-#### Cox Assumptions
+### Cox Assumptions
 
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Tests model assumptions
 test_coxph(res.cox.PGS)
 
@@ -427,7 +442,7 @@ plot(residuals(res.cox.PGS))
 ```
 
 
-### ADAS13
+## ADAS13
 
 "The ADAS13 was included as a global measure of cognitive function. ADAS13 is a test battery developed to assess severity of cognitive impairment associated with AD and includes subtests and clinical evaluations assessing memory function, reasoning, language function, orientation and praxis. The ADAS13 is a modified version of the original ADAS-Cog-11, adding a cancellation task and a delayed free recall task. The higher the scores, the more severe impairment of cognitive function." (Mofrad et al., 2021)
 
@@ -458,9 +473,9 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-#### Cox Assumptions
+### Cox Assumptions
 
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Tests model assumptions
 test_coxph(res.cox.PGS)
 
@@ -469,7 +484,7 @@ ggcoxfunctional(Surv(VISCODE, ADAS13_cut) ~ age + sqrt(age) + log(age), data = c
 plot(residuals(res.cox.PGS))
 ```
 
-### ADASQ4
+## ADASQ4
 
 
 ```{r, echo=FALSE, message=FALSE}
@@ -498,9 +513,9 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-#### Cox Assumptions
+### Cox Assumptions
 
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Tests model assumptions
 test_coxph(res.cox.PGS)
 
@@ -509,7 +524,7 @@ ggcoxfunctional(Surv(VISCODE, ADASQ4_cut) ~ age + sqrt(age) + log(age), data = c
 plot(residuals(res.cox.PGS))
 ```
 
-## CDRSB
+# CDRSB
 
 "The clinical dementia rating (CDR) scale is commonly used to diagnose dementia due to Alzheimer's disease (AD). The sum of boxes of the CDR (CDR-SB) has recently been emphasized and applied to interventional trials for tracing the progression of cognitive impairment (CI) in the early stages of AD." ([Tzeng et al., 2022](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9537043/))
 
@@ -541,7 +556,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## DIGITSCORE
+# DIGITSCORE
 
 "The DSST (Digit Symbol Substitution Test) is a paper-and-pencil cognitive test presented on a single sheet of paper that requires a subject to match symbols to numbers according to a key located on the top of the page. The subject copies the symbol into spaces below a row of numbers. The number of correct symbols within the allowed time, usually 90 to 120 seconds, constitutes the score." ([Jaeger, 2018](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6291255/)) The lower the scores, the more severe impairment of cognitive function.
 
@@ -571,7 +586,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## FAQ
+# FAQ
 
 The Functional Activities Questionnaire is used to assess an individual's functional abilities in daily living activities. It is a caregiver-based questionnaire that helps evaluate how well a person is able to perform various instrumental activities of daily living (IADLs) and basic activities of daily living (ADLs). (ChatGPT) Sum scores (range 0-30). The score range for each item is 0--3 (higher scores indicate greater impairment; 0 = normal or never did but could do now; 1 = has difficulty but does by self or never did but would have difficulty now; 2 = requires assistance; 3 = dependent). There is no established cut-off score for IADL impairment on the FAQ. However, one study reported that a total FAQ score (sum of all 10 item scores; range 0--30) of ≥ 6 is suggestive of functional impairment [ [20](https://pubmed.ncbi.nlm.nih.gov/15592138/)]. ([Marshall et al., 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4448081/))
 
@@ -601,7 +616,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## LDELTOTAL
+# LDELTOTAL
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$LDELTOTAL <- calc_neg_cvalue(LDELTOTAL)
@@ -629,7 +644,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## MOCA
+# MOCA
 
 Reference literature: doi: 10.1111/j.1532-5415.2005.53221.x
 
@@ -657,13 +672,13 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## Rey-Auditory Verbal Learning Test (RAVLT)
+# Rey-Auditory Verbal Learning Test (RAVLT)
 
 The RAVLT was included as a measure of memory function. In this test, the participants are asked to recall words from a list of 15 nouns immediately after each of five learning trials and after a short and a long delay. Two measures known to be sensitive to cognitive changes in patients with AD were included in the present study: Immediate recall (RAVLT-Im): the number of correct responses across the immediate recall of the five learning trials; percent forgetting (RAVLT-PF): the score on the fifth learning trial minus the score on the long delayed recall, divided by the score obtained on the fifth learning trial. The lower the scores, the more severe impairment of cognitive function.
 
 Different summary scores are derived from raw RAVLT scores. These include RAVLT Immediate (the sum of scores from 5 first trials (Trials 1 to 5)), RAVLT Learning (the score of Trial 5 minus the score of Trial 1), RAVLT Forgetting (the score of Trial 5 minus score of the delayed recall) and RAVLT Percent Forgetting (RAVLT Forgetting divided by the score of Trial 5). We use naming of the ADNI merge table3 for these summary measures. We investigated the relationship between MRI measures and RAVLT cognitive test scores by estimating the RAVLT Immediate and RAVLT Percent Forgetting from the gray matter density. These two summary scores were selected since they highlight different aspects of episodic memory, learning (RAVLT Immediate) and delayed memory (RAVLT Percent forgetting), essential to AD and previous studies (Estévez-González et al., 2003, Wang et al., 2011, Gomar et al., 2014, Moradi et al., 2015) have indicated strong relationships between these two RAVLT measures and Alzheimer's disease.
 
-### RAVLT Immediate
+## RAVLT Immediate
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_immediate <- calc_neg_cvalue(RAVLT_immediate)
@@ -691,7 +706,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### RAVLT Percentage Forgetting
+## RAVLT Percentage Forgetting
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_perc_forgetting <- calc_pos_cvalue(RAVLT_perc_forgetting)
@@ -719,7 +734,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### RAVLT Forgetting
+## RAVLT Forgetting
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_forgetting <- calc_pos_cvalue(RAVLT_forgetting)
@@ -747,7 +762,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### RAVLT Learning
+## RAVLT Learning
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$RAVLT_learning <- calc_pos_cvalue(RAVLT_learning)
@@ -775,7 +790,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## TRABSCORE
+# TRABSCORE
 
 The Trail Making Test is a neuropsychological test of visual attention and task switching. It has two parts, in which the subject is instructed to connect a set of 25 dots as quickly as possible while maintaining accuracy.
 
@@ -809,11 +824,11 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## Patient's Everyday Cognition (EcogPt)
+# Patient's Everyday Cognition (EcogPt)
 
 The original version of the ECog is an informant-based measure of cognitively-relevant everyday abilities comprised of 39 items, covering six cognitively-relevant domains: Everyday Memory, Everyday Language, Everyday Visuospatial Abilities, and Everyday Planning, Everyday Organization, and Everyday Divided Attention. Ratings are made on a four-point scale: 1 = better or no change compared to 10 years earlier, 2 = questionable/occasionally worse, 3 = consistently a little worse, 4 = consistently much worse. ([Tomaszewski Farias et al., 2012](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3211103/))
 
-### EcogPt Everyday Divided Attention
+## EcogPt Everyday Divided Attention
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$EcogPtDivatt <- calc_pos_cvalue(EcogPtDivatt)
@@ -841,7 +856,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogPt Everyday Language
+## EcogPt Everyday Language
 
 ```{r, echo=FALSE}
 cvalue$EcogPtLang <- calc_pos_cvalue(EcogPtLang)
@@ -869,7 +884,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogPt Everyday Memory
+## EcogPt Everyday Memory
 
 ```{r, echo=FALSE}
 cvalue$EcogPtMem <- calc_pos_cvalue(EcogPtMem)
@@ -897,7 +912,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogPt Everyday Organization
+## EcogPt Everyday Organization
 
 ```{r, echo=FALSE}
 cvalue$EcogPtOrgan <- calc_pos_cvalue(EcogPtOrgan)
@@ -925,7 +940,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogPt Everyday Planning
+## EcogPt Everyday Planning
 
 ```{r, echo=FALSE}
 cvalue$EcogPtPlan <- calc_pos_cvalue(EcogPtPlan)
@@ -953,7 +968,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogPt Everyday Visuospatial Abilities
+## EcogPt Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE}
 cvalue$EcogPtVisspat <- calc_pos_cvalue(EcogPtVisspat)
@@ -981,7 +996,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogPt Total
+## EcogPt Total
 
 ```{r, echo=FALSE}
 cvalue$EcogPtTotal <- calc_pos_cvalue(EcogPtTotal)
@@ -1009,9 +1024,9 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
+# Self-Reported Everyday Cognitive Abilities Questionnaire (EcogSP)
 
-### EcogSP Everyday Divided Attention
+## EcogSP Everyday Divided Attention
 
 ```{r, echo=FALSE}
 cvalue$EcogSPDivatt <- calc_pos_cvalue(EcogSPDivatt)
@@ -1039,7 +1054,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogSP Everyday Language
+## EcogSP Everyday Language
 
 ```{r, echo=FALSE}
 cvalue$EcogSPLang <- calc_pos_cvalue(EcogSPLang)
@@ -1067,7 +1082,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogSP Everyday Memory
+## EcogSP Everyday Memory
 
 ```{r, echo=FALSE}
 cvalue$EcogSPMem <- calc_pos_cvalue(EcogSPMem)
@@ -1095,7 +1110,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogSP Everyday Organization
+## EcogSP Everyday Organization
 
 ```{r, echo=FALSE}
 cvalue$EcogSPOrgan <- calc_pos_cvalue(EcogSPOrgan)
@@ -1123,7 +1138,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogSP Everyday Planning
+## EcogSP Everyday Planning
 
 ```{r, echo=FALSE}
 cvalue$EcogSPPlan <- calc_pos_cvalue(EcogSPPlan)
@@ -1151,7 +1166,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogSP Everyday Visuospatial Abilities
+## EcogSP Everyday Visuospatial Abilities
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$EcogSPVisspat <- calc_pos_cvalue(EcogSPVisspat)
@@ -1179,7 +1194,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-### EcogSP Total
+## EcogSP Total
 
 ```{r, echo=FALSE}
 cvalue$EcogSPTotal <- calc_pos_cvalue(EcogSPTotal)
@@ -1207,7 +1222,7 @@ plot_coxph_PGS(res.cox.PGS)
 plot_coxph_years(res.cox.years)
 ```
 
-## Print session info:
+# Print session info:
 
 ```{r print_session_info}
 ##Print session info:
