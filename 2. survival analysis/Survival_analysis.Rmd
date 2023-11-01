@@ -29,8 +29,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Load in data from preprocessing and apply filter
 long_dat <- read.csv("../1.\ preprocessing/output/long_dat.csv")
-
 wide_dat <- read.csv("../1.\ preprocessing/output/wide_dat.csv")
+
+remission_dat <- data.frame(row.names = c("MMSE_cut","ADAS11_cut", "ADAS13_cut", "ADASQ4_cut", "CDRSB_cut", "DIGITSCORE_cut", "FAQ_cut", "LDELTOTAL_cut"), "Num" = c(NA,NA,NA,NA,NA,NA,NA,NA))
 ```
 
 ## Create functions
@@ -78,9 +79,18 @@ filter_data <- function(outcome_var){
     group_by(RID) %>%
     mutate(tRecovery = ifelse(lag({{outcome_var}} == 1) & {{outcome_var}} == 0, 1, 0),
            tRecovery = ifelse(is.na(tRecovery),0,tRecovery),
-           ntRecovery = ifelse(any(tRecovery == 1),1,0),)%>%
+           ntRecovery = ifelse(any(tRecovery == 1),1,0),) %>%
     #filter(ntRecovery==0) %>%
     relocate({{outcome_var}}, .before=tRecovery)
+  
+  rem_num <- cox_filtered_dat %>%
+    group_by(RID) %>%
+    summarize("0" = sum(tRecovery == 0),
+              "1" = sum(tRecovery == 1)) %>%
+    filter('1' > 0) %>%
+    summarize(count = n())
+
+  remission_dat[paste(outcome_var),"Num"] <- rbind(remission_dat,rem_num) 
 }
 
 # Fits a Cox Hazards model on a data frame using thirtile PGS as a main predictor
@@ -323,34 +333,6 @@ cox_filtered_dat <- cox_filtered_dat %>%
          PTGENDER = as.factor(PTGENDER)) 
 ```
 
-## Descriptive Statistics
-
-The following output shows:
-
-  1. the number of individuals overall
-  2. the number of unique individuals in the analysis
-  3. the number of males/females in the analysis
-  4. the number of individuals per time-point
-
-```{r, echo=FALSE}
-length(unique(long_dat$RID)) # Number of individuals overall
-
-length(unique(cox_filtered_dat$RID)) # Number of unique individuals in the analysis
-
-print(gender_counts <- cox_filtered_dat %>% # Number of Males/Females in Sample
-  distinct(RID, .keep_all = TRUE) %>%  
-  group_by(PTGENDER) %>%
-  summarize(Count = n()))
-
-
-print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
-  group_by(VISCODE) %>%
-  summarize(Count = n()))
-```
-From now on, the reference for the regression model is:
-  * "Medium PGS" for thirtile_PGS
-  * "Medium EA" for thirtile_years
-
 ```{r, echo=FALSE}
 ################################################################################
 # Set Reference Level of PGS & Years
@@ -360,8 +342,6 @@ cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS
 
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_years <- relevel(thirtile_years, ref="Medium EA")) # Change the Reference Level of the EA factor
 ```
-
-Here is the output for the Cox Proportional Hazards model of MMSE
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 ################################################################################
@@ -1235,6 +1215,27 @@ mlr_years_adas11 <- lmer(ADAS11 ~ thirtile_years + age + PTGENDER + age*PTGENDER
 mlr_models <- list(mlr_pgs_adas11,mlr_years_adas11)
 
 lapply(mlr_models, summary)
+```
+
+# Descriptive Statistics
+
+```{r, echo=FALSE}
+length(unique(long_dat$RID)) # Number of individuals overall
+
+length(unique(cox_filtered_dat$RID)) # Number of unique individuals in the analysis
+
+print(gender_counts <- cox_filtered_dat %>% # Number of Males/Females in Sample
+  distinct(RID, .keep_all = TRUE) %>%  
+  group_by(PTGENDER) %>%
+  summarize(Count = n()))
+
+
+print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
+  group_by(VISCODE) %>%
+  summarize(Count = n()))
+
+# Plot the freq of remission by Cognitive Test
+
 ```
 
 # Print session info:
