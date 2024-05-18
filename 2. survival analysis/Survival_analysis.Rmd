@@ -5,7 +5,7 @@ output: rmdformats::robobook
 ---
 
 ```{r, include=FALSE}
-if (suppressWarnings(!require(dplyr))) {install.packages("dplyr"); library(dplyr)}
+if (suppressWarnings(!require(tidyverse))) {install.packages("tidyverse"); library(dplyr)}
 if (suppressWarnings(!require(NormPsy))) {install.packages("NormPsy"); library(NormPsy)}
 if (suppressWarnings(!require(gridExtra))) {install.packages("gridExtra"); library(gridExtra)}
 if (suppressWarnings(!require(rmdformats))) {install.packages("rmdformats"); library(rmdformats)}
@@ -31,14 +31,22 @@ knitr::opts_chunk$set(echo = TRUE)
 long_dat <- read.csv("../1.\ preprocessing/output/long_dat.csv")
 wide_dat <- read.csv("../1.\ preprocessing/output/wide_dat.csv")
 
-remission_dat <- data.frame(row.names = c("MMSE_cut","ADAS11_cut", "ADAS13_cut", "ADASQ4_cut", "CDRSB_cut", "DIGITSCORE_cut", "FAQ_cut", "LDELTOTAL_cut"), "Num" = c(NA,NA,NA,NA,NA,NA,NA,NA))
+remission_dat <- data.frame(row.names = c("MMSE_cut",
+                                          "ADAS11_cut", 
+                                          "ADAS13_cut", 
+                                          "ADASQ4_cut", 
+                                          "CDRSB_cut", 
+                                          "DIGITSCORE_cut", 
+                                          "FAQ_cut", 
+                                          "LDELTOTAL_cut"), 
+                            "Num" = c(NA,NA,NA,NA,NA,NA,NA,NA))
 ```
 
 ## Create functions
 
 Here, we create functions for:
 
-  * Calculating cut-off values using either mean + 2SD or mean - 2SD
+  * Calculating cut-off values using either mean + 2SD or mean - 2*SD
   * Calculating whether individuals recover from a drop in a test
   * Fit a cox regression based on thirtile_years or thirtile_PGS
   * Plot the survival curve for the cox regression
@@ -206,7 +214,7 @@ long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 
 # Mini-Mental State Examination (MMSE)
 
-"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org). The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated.
+"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org). 
 
 ```{r, echo=FALSE}
 cvalue <- list() # initialize list of cut-off values
@@ -224,13 +232,16 @@ long_dat$MMSE_cut <- ifelse(long_dat$MMSE_norm < cvalue$MMSE_norm, 1, 0) # Group
 
 ```
 
+The MMSE scores were normalized using the NormPsy package and then the cut-off was calculated to be `r c_cut$MMSE_norm`
 
 ## Boxplots of MMSE by Age Group at Baseline
 
 To see if it is necessary to stratify for age groups effect of polygenic risk score for EA and age group was tested using linear regression. The results are displayed below.
 
 ```{r, echo=FALSE, warning=FALSE}
-filtered_long_dat <- long_dat %>% #filter out NA cases (== AGE is not between 60-75)
+
+#filter out NA cases (== AGE is not between 60-75)
+filtered_long_dat <- long_dat %>% 
   filter(!is.na(Age_Group), VISCODE==0)
 
 # Boxplot for MMSE by Age Group
@@ -284,10 +295,10 @@ We created "age" as a time-dependent variable as well as "tstart" and "tstop".
 
 ```{r, echo=FALSE}
 months <- c("bl", "m03", "m06", "m12", "m18", "m24", 
-                                    "m30","m36", "m42", "m48", "m54", "m60", 
-                                    "m66", "m72","m78", "m84", "m90", "m96", 
-                                    "m102", "m108","m114", "m120", "m126", 
-                                    "m132", "m144", "m156")
+            "m30","m36", "m42", "m48", "m54", "m60",
+            "m66", "m72","m78", "m84", "m90", "m96",
+            "m102", "m108","m114", "m120", "m126",
+            "m132", "m144", "m156")
 
 time_points <- data.frame(Time = seq(0,27),
                           Months = c(0,3,6,12,seq(from = 18, to = 156, by = 6)))
@@ -1209,7 +1220,7 @@ plot_coxph_years(res.cox.years)
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_PGS <- relevel(thirtile_PGS, ref="Low PGS")) # Change the Reference Level of the PGS factor
 cox_filtered_dat <- within(cox_filtered_dat,thirtile_years <- relevel(thirtile_years, ref="Low EA")) # Change the Reference Level of the PGS factor
 
-mlr_pgs_adas11 <- lmer(ADAS11 ~ thirtile_PGS + age + PTGENDER + age*PTGENDER + (1 | RID), data=cox_filtered_dat) # Multi-Level Model for PGS
+mlr_pgs_adas11 <- lme4::lmer(ADAS11 ~ thirtile_PGS + age + PTGENDER + age*PTGENDER + (1 | RID), data=cox_filtered_dat) # Multi-Level Model for PGS
 mlr_years_adas11 <- lmer(ADAS11 ~ thirtile_years + age + PTGENDER + age*PTGENDER + (1 | RID), data=cox_filtered_dat) # Multi-Level Model for Years
 
 mlr_models <- list(mlr_pgs_adas11,mlr_years_adas11)
