@@ -2,6 +2,8 @@
 title: "PGS Educational Attainment"
 author: Sebastian Marten & Amaury Pelzer
 output: rmdformats::robobook
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r, include=FALSE}
@@ -46,11 +48,11 @@ remission_dat <- data.frame(row.names = c("MMSE_cut",
 
 Here, we create functions for:
 
-  * Calculating cut-off values using either mean + 2SD or mean - 2*SD
-  * Calculating whether individuals recover from a drop in a test
-  * Fit a cox regression based on thirtile_years or thirtile_PGS
-  * Plot the survival curve for the cox regression
-  * Test model assumptions for the cox regression
+-   Calculating cut-off values using either mean + 2SD or mean - 2\*SD
+-   Calculating whether individuals recover from a drop in a test
+-   Fit a cox regression based on thirtile_years or thirtile_PGS
+-   Plot the survival curve for the cox regression
+-   Test model assumptions for the cox regression
 
 ```{r, echo=FALSE}
 # Calculates cut-off values using mean + 2SD of control (cognitively normal) at baseline
@@ -214,7 +216,7 @@ long_dat <- merge(wide_dat_sub, long_dat, by="RID", all.y=TRUE)
 
 # Mini-Mental State Examination (MMSE)
 
-"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org). 
+"The mini--mental state examination (MMSE) is a 30-point questionnaire that is used extensively in clinical and research settings to measure cognitive impairment. It is commonly used in medicine and allied health to screen for dementia. It is also used to estimate the severity and progression of cognitive impairment and to follow the course of cognitive changes in an individual over time; thus making it an effective way to document an individual's response to treatment.Administration of the test takes between 5 and 10 minutes and examines functions including registration (repeating named prompts), attention and calculation, recall, language, ability to follow simple commands and orientation. [...] Any score of 24 or more (out of 30) indicates a normal cognition. Below this, scores can indicate severe (≤9 points), moderate (10--18 points) or mild (19-23 points) cognitive impairment." (Wikipedia.org).
 
 ```{r, echo=FALSE}
 cvalue <- list() # initialize list of cut-off values
@@ -383,7 +385,6 @@ ggcoxfunctional(Surv(VISCODE, MMSE_cut) ~ age + sqrt(age) + log(age), data = cox
 plot(residuals(res.cox.PGS))
 ```
 
-
 # Alzheimer's Disease Assessment Scale
 
 The Cognitive Subscale Alzheimer's Disease Assessment Scale (ADAS) is made of 11 tasks that include both subject-completed tests and observer-based assessments, assessing the memory, language, and praxis domains. The result is a global final score ranging from 0 to 70, based on the sum of the scores of the single tasks (ADAS11).
@@ -433,11 +434,9 @@ ggcoxfunctional(Surv(VISCODE, ADAS11_cut) ~ age + sqrt(age) + log(age), data = c
 plot(residuals(res.cox.PGS))
 ```
 
-
 ## ADAS13
 
 "The ADAS13 was included as a global measure of cognitive function. ADAS13 is a test battery developed to assess severity of cognitive impairment associated with AD and includes subtests and clinical evaluations assessing memory function, reasoning, language function, orientation and praxis. The ADAS13 is a modified version of the original ADAS-Cog-11, adding a cancellation task and a delayed free recall task. The higher the scores, the more severe impairment of cognitive function." (Mofrad et al., 2021)
-
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$ADAS13 <- calc_pos_cvalue(ADAS13)
@@ -477,7 +476,6 @@ plot(residuals(res.cox.PGS))
 ```
 
 ## ADASQ4
-
 
 ```{r, echo=FALSE, message=FALSE}
 cvalue$ADASQ4 <- calc_pos_cvalue(ADASQ4)
@@ -1248,6 +1246,30 @@ print(age_dist <- cox_filtered_dat %>% # Number of Individual by Time-point
 # Plot the freq of remission by Cognitive Test
 
 ```
+
+# Cross-sectional because... FUCK WHY NOT?!
+
+Does educational attainment or genetic EA affect an individuals risk for MCI at age x?
+
+```{r}
+rm(list=setdiff(ls(), "long_dat"))
+
+baseline_df <- long_dat %>% 
+  filter(VISCODE == 0 & (DX == "CN"| DX == "MCI"))
+
+summary(lm(MMSE_norm~DX+PTEDUCAT*EA22 + AGE*PTGENDER, data = baseline_df))
+
+baseline_df %>% 
+ggplot() +
+  geom_violin(aes(x = DX,y =MMSE_norm)) +
+  facet_wrap(~thirtile_PGS) +
+  stat_summary(aes(x = DX,y =MMSE_norm),
+               geom = "point",
+               fun = mean)
+
+ggscatter(baseline_df, x = "AGE", y = "MMSE_norm", conf.int = T, cor.coef = T)
+```
+
 
 # Print session info:
 

@@ -352,11 +352,12 @@ rm(list= setdiff(ls(), c("long_dat", "wide_dat")))
 
 ```{r, echo=FALSE, message=FALSE}
 # Read in the PGS send to us by Rick
-pgs <- readr::read_tsv("data/ADNI_PRS_results_EA_EA22.tsv")
+pgs <- read.csv("data/EA_2022_Okbay_curated.PRS.auto.csv") %>% 
+  rename("EA22" = "score")
 
 # Merge the EA data with the corresponding participant in each data frame
-long_dat <- merge(long_dat, pgs,by.x="PTID",by.y="SampleID") 
-wide_dat <- merge(wide_dat, pgs,by.x="PTID",by.y="SampleID")
+long_dat <- merge(long_dat, pgs,by.x="PTID",by.y="sample.ID") 
+wide_dat <- merge(wide_dat, pgs,by.x="PTID",by.y="sample.ID")
 ```
 
 The merge(by.x, by.y) function creates a new data frame that only keeps those rows for which there is a matching key (in our case PTID). Therefore, we do have genetic data from 2 additional individuals for which we do not have any other measurements. The final data frame for which testing data and genetic data is available is thus, 1408 (N).
@@ -442,7 +443,7 @@ ggplot() +
 # Create a folder called "output" if it doesn't exist
 if (!file.exists("output")) {
   dir.create("output")
-}
+  }
 
 # Save wide_dat as a CSV file in the "output" folder
 write.csv(wide_dat, file = "output/wide_dat.csv", row.names = FALSE)
